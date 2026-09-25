@@ -1,26 +1,57 @@
 @import "tailwindcss";
 
+/*
+ * BanaTrack palette — drawn from the banana plant: leaf/forest greens as the
+ * primary, banana-gold as the accent for key actions and highlights.
+ */
+@theme {
+  --color-leaf-50: #f2f8f3;
+  --color-leaf-100: #e1efe4;
+  --color-leaf-200: #c3dfca;
+  --color-leaf-300: #97c7a4;
+  --color-leaf-400: #63a878;
+  --color-leaf-500: #3f8b58;
+  --color-leaf-600: #2e7046;
+  --color-leaf-700: #255939;
+  --color-leaf-800: #1f4730;
+  --color-leaf-900: #183a28;
+  --color-leaf-950: #0d2217;
+
+  --color-banana-50: #fefae8;
+  --color-banana-100: #fdf1c4;
+  --color-banana-200: #fbe38a;
+  --color-banana-300: #f7cf4a;
+  --color-banana-400: #f0bb22;
+  --color-banana-500: #d9a011;
+  --color-banana-600: #b47c0c;
+  --color-banana-700: #8f5d0f;
+
+  --color-canvas: #f6f7f2;
+  --color-ink: #16241b;
+  --color-muted: #5d6b62;
+  --color-line: #e2e6dc;
+
+  --font-sans: var(--font-jakarta), ui-sans-serif, system-ui, sans-serif;
+  --font-display: var(--font-bricolage), var(--font-jakarta), ui-sans-serif,
+    system-ui, sans-serif;
+  --font-mono: var(--font-geist-mono), ui-monospace, monospace;
+}
+
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
-}
-
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+  color-scheme: light;
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  background: var(--color-canvas);
+  color: var(--color-ink);
+  font-family: var(--font-sans);
+}
+
+@media print {
+  .no-print {
+    display: none !important;
+  }
+  body {
+    background: white;
+  }
 }
