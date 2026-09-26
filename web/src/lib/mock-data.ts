@@ -4,50 +4,14 @@
  * Everything in this file is invented. None of it comes from the plantation,
  * a trained model, or a weather service. Every UI section that reads from
  * here must display a <SampleTag />. Replace module-by-module as real
- * sources (Supabase tables, Open-Meteo, the FastAPI inference service) land.
+ * sources (Supabase tables, the FastAPI inference service) land. Weather is
+ * already real — see lib/weather.ts.
  */
 
 export type Severity = "none" | "low" | "moderate" | "high";
 export type Priority = "High" | "Medium" | "Low";
 export type Disease = "Moko" | "Panama";
 export type ReviewStatus = "pending" | "confirmed" | "corrected" | "rejected" | "escalated";
-export type WeatherCondition = "sun" | "partly" | "cloud" | "rain" | "storm";
-
-// ---------------------------------------------------------------- Weather
-
-export interface WeatherDay {
-  day: string;
-  date: string;
-  condition: WeatherCondition;
-  tempMax: number;
-  tempMin: number;
-  rainMm: number;
-  humidity: number;
-}
-
-export const weatherLocation = "Tagum City, Davao del Norte";
-
-export const weatherForecast: WeatherDay[] = [
-  { day: "Today", date: "Sep 25", condition: "rain", tempMax: 31, tempMin: 24, rainMm: 18, humidity: 88 },
-  { day: "Fri", date: "Sep 26", condition: "storm", tempMax: 30, tempMin: 24, rainMm: 32, humidity: 91 },
-  { day: "Sat", date: "Sep 27", condition: "rain", tempMax: 30, tempMin: 23, rainMm: 21, humidity: 89 },
-  { day: "Sun", date: "Sep 28", condition: "cloud", tempMax: 31, tempMin: 24, rainMm: 6, humidity: 84 },
-  { day: "Mon", date: "Sep 29", condition: "partly", tempMax: 32, tempMin: 24, rainMm: 2, humidity: 79 },
-  { day: "Tue", date: "Sep 30", condition: "sun", tempMax: 33, tempMin: 25, rainMm: 0, humidity: 74 },
-  { day: "Wed", date: "Oct 1", condition: "rain", tempMax: 31, tempMin: 24, rainMm: 14, humidity: 86 },
-];
-
-export const diseaseRisk = {
-  level: "Elevated" as const,
-  summary:
-    "Three consecutive days of heavy rain and humidity above 85% are forecast. Warm, waterlogged conditions favor the spread of soil- and water-borne wilt pathogens.",
-  factors: [
-    "71 mm cumulative rainfall expected over the next 3 days",
-    "Relative humidity ≥ 85% for 4 of the next 7 days",
-    "Mean temperature 24–31 °C (within favorable range)",
-  ],
-};
-
 // ---------------------------------------------------------------- Blocks
 
 export interface PlantationBlock {

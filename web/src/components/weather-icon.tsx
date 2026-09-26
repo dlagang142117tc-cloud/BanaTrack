@@ -1,5 +1,5 @@
 import { Cloud, CloudLightning, CloudRain, CloudSun, Sun } from "lucide-react";
-import type { WeatherCondition } from "@/lib/mock-data";
+import type { WeatherCondition } from "@/lib/weather";
 
 const ICONS = {
   sun: { Icon: Sun, className: "text-banana-500", label: "Sunny" },

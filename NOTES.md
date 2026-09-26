@@ -59,8 +59,10 @@ Update this at the end of each session.
   state and vanish on refresh. Needs Supabase tables: incidents (+ photo
   storage), review actions (logged with model version + timestamp), screening
   submissions.
-- **No real weather** — Open-Meteo integration not started; forecast + risk
-  banner are hard-coded.
+- **Weather is real (Phase 1.5)** — `web/src/lib/weather.ts` pulls a 7-day
+  Open-Meteo forecast for Tagum City (cached 30 min) and derives the dashboard
+  risk banner from it. Location is a hard-coded constant, not per-plantation;
+  risk thresholds are rules of thumb, not calibrated against incident data.
 - **No AI/ML** — screening results are canned; FastAPI service, calibration,
   abstention threshold, Grad-CAM/SHAP not started. Photos are never uploaded.
 - **Reports filters are cosmetic** — date range and area are ignored; the

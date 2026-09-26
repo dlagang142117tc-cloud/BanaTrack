@@ -10,30 +10,31 @@ import {
   SampleTag,
   cx,
 } from "@/components/ui";
-import {
-  diseaseRisk,
-  incidentStats,
-  modelGovernance,
-  reviewCases,
-  weatherForecast,
-  weatherLocation,
-} from "@/lib/mock-data";
+import { incidentStats, modelGovernance, reviewCases } from "@/lib/mock-data";
+import { PLANTATION_LOCATION, assessDiseaseRisk, getForecast } from "@/lib/weather";
 
 const PRIORITY_ORDER = { High: 0, Medium: 1, Low: 2 };
+
+const RISK_TONE = {
+  Low: { box: "border-leaf-200 bg-leaf-50", icon: "bg-leaf-500 text-white", chip: "ring-leaf-200" },
+  Moderate: { box: "border-banana-300 bg-banana-50", icon: "bg-banana-400 text-ink", chip: "ring-banana-200" },
+  Elevated: { box: "border-banana-500 bg-banana-100", icon: "bg-banana-500 text-ink", chip: "ring-banana-300" },
+};
 
 export default async function DashboardPage() {
   const supabase = await createClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();
-  const { data: profile } = await supabase
-    .from("profiles")
-    .select("full_name, role")
-    .eq("id", user!.id)
-    .single();
+  const [{ data: profile }, forecast] = await Promise.all([
+    supabase.from("profiles").select("full_name, role").eq("id", user!.id).single(),
+    getForecast(),
+  ]);
 
   const firstName = profile?.full_name?.split(" ")[0];
-  const today = weatherForecast[0];
+  const today = forecast?.days[0];
+  const risk = forecast ? assessDiseaseRisk(forecast.days) : null;
+  const tone = RISK_TONE[risk?.level ?? "Moderate"];
   const topCases = [...reviewCases]
     .sort((a, b) => PRIORITY_ORDER[a.priority] - PRIORITY_ORDER[b.priority] || b.confidence - a.confidence)
     .slice(0, 4);
@@ -46,28 +47,43 @@ export default async function DashboardPage() {
       />
 
       {/* Disease-favorable conditions banner */}
-      <div className="relative overflow-hidden rounded-2xl border border-banana-300 bg-banana-50 p-5 sm:p-6">
+      <div
+        className={cx(
+          "relative overflow-hidden rounded-2xl border p-5 sm:p-6",
+          risk ? tone.box : "border-line bg-white",
+        )}
+      >
         <div className="flex flex-col gap-4 sm:flex-row sm:items-start">
-          <span className="grid size-10 shrink-0 place-items-center rounded-xl bg-banana-400 text-ink">
+          <span
+            className={cx(
+              "grid size-10 shrink-0 place-items-center rounded-xl",
+              risk ? tone.icon : "bg-canvas text-muted",
+            )}
+          >
             <AlertTriangle className="size-5" aria-hidden />
           </span>
           <div className="flex-1">
-            <div className="flex flex-wrap items-center gap-2">
-              <h2 className="font-display text-base font-semibold text-ink">
-                Disease-favorable conditions: {diseaseRisk.level}
-              </h2>
-              <SampleTag label="Placeholder forecast" />
-            </div>
-            <p className="mt-1 text-sm text-ink/80">{diseaseRisk.summary}</p>
-            <ul className="mt-3 flex flex-wrap gap-2">
-              {diseaseRisk.factors.map((f) => (
-                <li key={f} className="rounded-full bg-white/80 px-3 py-1 text-xs text-ink/80 ring-1 ring-banana-200">
-                  {f}
-                </li>
-              ))}
-            </ul>
+            <h2 className="font-display text-base font-semibold text-ink">
+              Disease-favorable conditions: {risk?.level ?? "Unavailable"}
+            </h2>
+            {risk ? (
+              <>
+                <p className="mt-1 text-sm text-ink/80">{risk.summary}</p>
+                <ul className="mt-3 flex flex-wrap gap-2">
+                  {risk.factors.map((f) => (
+                    <li key={f} className={cx("rounded-full bg-white/80 px-3 py-1 text-xs text-ink/80 ring-1", tone.chip)}>
+                      {f}
+                    </li>
+                  ))}
+                </ul>
+              </>
+            ) : (
+              <p className="mt-1 text-sm text-ink/80">
+                The weather forecast couldn&apos;t be loaded, so conditions can&apos;t be assessed right now.
+              </p>
+            )}
             <p className="mt-3 text-xs text-muted">
-              Contextual indicator only — this is not a diagnosis of any block or plant.
+              Contextual indicator based on the Open-Meteo forecast — this is not a diagnosis of any block or plant.
             </p>
           </div>
         </div>
@@ -106,37 +122,54 @@ export default async function DashboardPage() {
           title="7-day weather"
           description={
             <span className="inline-flex items-center gap-1">
-              <MapPin className="size-3" aria-hidden /> {weatherLocation}
+              <MapPin className="size-3" aria-hidden /> {PLANTATION_LOCATION.name}
             </span>
           }
-          action={<SampleTag label="Placeholder forecast" />}
+          action={
+            <a
+              href="https://open-meteo.com/"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-[11px] text-muted hover:text-ink"
+            >
+              Weather data by Open-Meteo
+            </a>
+          }
         >
-          <div className="flex items-center gap-4 rounded-xl bg-leaf-50 p-4">
-            <WeatherIcon condition={today.condition} className="size-10" />
-            <div>
-              <p className="font-display text-3xl font-semibold tabular-nums">{today.tempMax}°</p>
-              <p className="text-xs text-muted">Low {today.tempMin}° · Humidity {today.humidity}%</p>
-            </div>
-            <div className="ml-auto text-right">
-              <p className="inline-flex items-center gap-1 text-sm font-medium text-sky-700">
-                <Droplets className="size-4" aria-hidden /> {today.rainMm} mm
-              </p>
-              <p className="text-xs text-muted">expected rainfall</p>
-            </div>
-          </div>
-          <div className="-mx-1 mt-4 overflow-x-auto pb-1">
-            <ol className="grid min-w-[520px] grid-cols-7 gap-1 px-1">
-              {weatherForecast.map((d) => (
-                <li key={d.date} className="flex flex-col items-center gap-1.5 rounded-xl px-1 py-3 text-center hover:bg-leaf-50">
-                  <span className="text-xs font-semibold text-ink">{d.day}</span>
-                  <WeatherIcon condition={d.condition} className="size-6" />
-                  <span className="text-sm font-medium tabular-nums">{d.tempMax}°</span>
-                  <span className="text-xs tabular-nums text-muted">{d.tempMin}°</span>
-                  <span className="text-[11px] tabular-nums text-sky-700">{d.rainMm} mm</span>
-                </li>
-              ))}
-            </ol>
-          </div>
+          {!forecast || !today ? (
+            <p className="rounded-xl bg-canvas p-4 text-sm text-muted">
+              Forecast unavailable — couldn&apos;t reach Open-Meteo. Try refreshing in a few minutes.
+            </p>
+          ) : (
+            <>
+              <div className="flex items-center gap-4 rounded-xl bg-leaf-50 p-4">
+                <WeatherIcon condition={today.condition} className="size-10" />
+                <div>
+                  <p className="font-display text-3xl font-semibold tabular-nums">{today.tempMax}°</p>
+                  <p className="text-xs text-muted">Low {today.tempMin}° · Humidity {today.humidity}%</p>
+                </div>
+                <div className="ml-auto text-right">
+                  <p className="inline-flex items-center gap-1 text-sm font-medium text-sky-700">
+                    <Droplets className="size-4" aria-hidden /> {today.rainMm} mm
+                  </p>
+                  <p className="text-xs text-muted">expected rainfall</p>
+                </div>
+              </div>
+              <div className="-mx-1 mt-4 overflow-x-auto pb-1">
+                <ol className="grid min-w-[520px] grid-cols-7 gap-1 px-1">
+                  {forecast.days.map((d) => (
+                    <li key={d.date} className="flex flex-col items-center gap-1.5 rounded-xl px-1 py-3 text-center hover:bg-leaf-50">
+                      <span className="text-xs font-semibold text-ink">{d.day}</span>
+                      <WeatherIcon condition={d.condition} className="size-6" />
+                      <span className="text-sm font-medium tabular-nums">{d.tempMax}°</span>
+                      <span className="text-xs tabular-nums text-muted">{d.tempMin}°</span>
+                      <span className="text-[11px] tabular-nums text-sky-700">{d.rainMm} mm</span>
+                    </li>
+                  ))}
+                </ol>
+              </div>
+            </>
+          )}
         </Card>
 
         {/* Top review priority */}
