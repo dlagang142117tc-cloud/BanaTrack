@@ -11,6 +11,10 @@ export async function login(_prevState: unknown, formData: FormData) {
   const { error } = await supabase.auth.signInWithPassword({ email, password });
 
   if (error) {
+    // Deactivated accounts are banned in Supabase Auth (see users/actions.ts).
+    if (error.code === "user_banned") {
+      return { error: "This account has been deactivated. Contact an admin to restore access." };
+    }
     return { error: error.message };
   }
 

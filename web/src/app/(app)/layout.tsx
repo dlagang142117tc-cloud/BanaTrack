@@ -16,9 +16,18 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
 
   const { data: profile } = await supabase
     .from("profiles")
-    .select("full_name, role")
+    .select("full_name, role, must_change_password, deactivated_at")
     .eq("id", user.id)
     .single();
+
+  // Deactivation also bans the account in Supabase Auth, but an already
+  // issued session can outlive that until it expires, so sign it out here.
+  if (profile?.deactivated_at) {
+    redirect("/auth/deactivated");
+  }
+  if (profile?.must_change_password) {
+    redirect("/change-password");
+  }
 
   return (
     <AppShell

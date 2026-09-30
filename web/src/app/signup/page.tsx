@@ -3,6 +3,7 @@
 import { useActionState } from "react";
 import Link from "next/link";
 import { AuthFrame } from "@/components/auth-frame";
+import { PasswordInput } from "@/components/password-input";
 import { buttonStyles, cx, inputStyles, labelStyles } from "@/components/ui";
 import { signup } from "./actions";
 
@@ -37,28 +38,18 @@ export default function SignupPage() {
               <label htmlFor="password" className={labelStyles}>
                 Password
               </label>
-              <input
-                id="password"
-                name="password"
-                type="password"
-                autoComplete="new-password"
-                minLength={6}
-                required
-                className={inputStyles}
-              />
+              <PasswordInput id="password" name="password" autoComplete="new-password" minLength={6} required />
             </div>
             <div className="flex flex-col gap-1.5">
               <label htmlFor="confirm_password" className={labelStyles}>
                 Confirm
               </label>
-              <input
+              <PasswordInput
                 id="confirm_password"
                 name="confirm_password"
-                type="password"
                 autoComplete="new-password"
                 minLength={6}
                 required
-                className={inputStyles}
               />
             </div>
           </div>

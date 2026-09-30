@@ -5,6 +5,60 @@ Update this at the end of each session.
 
 ---
 
+## Session: 2026-09-30 — Admin account actions (branch `feature/user-admin-actions`)
+
+### Added
+
+- **`supabase/admin-actions.sql`** — run after `user-management.sql`:
+  - `profiles.must_change_password` (bool) and `profiles.deactivated_at`.
+  - Signed-in users can now only UPDATE `full_name` and `role` (column
+    grants), so nobody can clear their own flags via the API. Existing RLS
+    policies unchanged.
+  - `is_admin()` now also requires the admin to be active.
+  - `list_users()` also returns the two new columns.
+  - `guard_role_change` counts only *active* admins and also fires on
+    `deactivated_at`; new `guard_profiles_delete` trigger blocks deleting the
+    last active admin (also covers Auth Admin API deletes via the cascade).
+  - `admin_actions` audit table (actor, action, target id + email snapshot,
+    non-sensitive details, timestamp). Admin-only SELECT policy; no write
+    policies — only the server (service role) inserts. No passwords stored.
+- **Service role client** — `web/src/lib/supabase/admin.ts`, marked
+  `server-only`, reads `SUPABASE_SERVICE_ROLE_KEY` (no `NEXT_PUBLIC_`). Verified
+  the variable name doesn't appear in `.next/static` after build.
+- **`/users` account actions** (`users/actions.ts`, `users/user-actions.tsx`),
+  each in a dialog, each re-checking on the server that the caller is an
+  active admin, and each logged to `admin_actions` (role changes too):
+  - **Reset password** — admin sets a temporary password (+ confirm, min 8
+    chars, `lib/passwords.ts`); sets `must_change_password`.
+  - **Deactivate / Reactivate** — sets `deactivated_at` and bans/unbans the
+    user in Supabase Auth. Account and records are kept. "DEACTIVATED" and
+    "TEMP PASSWORD" badges in the table.
+  - **Delete** — admin must type the user's email; the server re-checks it.
+    `ACTIVITY_TABLES` in `users/actions.ts` is an empty list today — add
+    incidents / screenings / review tables there and delete will refuse users
+    with records (deactivate instead).
+  - Safety: no self reset/deactivate/delete; the last active admin can't be
+    deactivated or deleted (checked in the action and again in the database).
+- **Forced password change** — `/change-password` (outside the app shell).
+  `(app)/layout.tsx` redirects flagged users there; the flag is cleared with
+  the service role after `auth.updateUser` succeeds.
+- **Deactivated sessions** — `(app)/layout.tsx` sends deactivated users to
+  `/auth/deactivated` (route handler that signs out) → `/login?deactivated=1`.
+  Login shows a friendly message for banned accounts.
+- **`.env.local.example`** is now tracked (`!.env.local.example` in
+  `web/.gitignore`) and lists `SUPABASE_SERVICE_ROLE_KEY`.
+- **Recent admin actions** card on `/users` (last 20, read through RLS).
+
+### Still missing / incomplete
+
+- Not yet tested against the live Supabase project — needs `admin-actions.sql`
+  run and the service role key in `web/.env.local`.
+- Until `admin-actions.sql` is run, the app layout's profile query fails
+  (unknown columns), so the sidebar shows "No role assigned".
+- A reset password doesn't revoke the user's existing sessions.
+
+---
+
 ## Session: 2026-09-30 — Admin user management (branch `feature/user-management`)
 
 ### Added
