@@ -1,4 +1,4 @@
-/** Mirrors the public.user_role enum in supabase/schema.sql. */
+/** Mirrors the public.user_role enum in supabase/migrations/001_schema.sql. */
 export const ROLES = ["admin", "supervisor", "disease_in_charge", "field_personnel"] as const;
 
 export type Role = (typeof ROLES)[number];

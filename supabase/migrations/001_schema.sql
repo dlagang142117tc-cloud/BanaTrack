@@ -1,5 +1,5 @@
 -- BanaTrack: users & role management (Tier 1, feature #1)
--- Run this in the Supabase SQL editor for a fresh project.
+-- Migration 001. Run this first in the Supabase SQL editor for a fresh project.
 
 create type public.user_role as enum (
   'admin',

@@ -1,12 +1,18 @@
 "use client";
 
-import { useActionState } from "react";
+import { use, useActionState } from "react";
 import Link from "next/link";
 import { AuthFrame } from "@/components/auth-frame";
+import { PasswordInput } from "@/components/password-input";
 import { buttonStyles, cx, inputStyles, labelStyles } from "@/components/ui";
 import { login } from "./actions";
 
-export default function LoginPage() {
+export default function LoginPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ [key: string]: string | string[] | undefined }>;
+}) {
+  const { deactivated } = use(searchParams);
   const [state, formAction, pending] = useActionState(login, undefined);
 
   return (
@@ -14,6 +20,12 @@ export default function LoginPage() {
       title="Welcome back"
       subtitle="Sign in to continue. Your account role determines what you can see."
     >
+      {deactivated && !state?.error && (
+        <p className="mb-4 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">
+          Your account has been deactivated. Contact an admin to restore access.
+        </p>
+      )}
+
       <form action={formAction} className="flex flex-col gap-4">
         <div className="flex flex-col gap-1.5">
           <label htmlFor="email" className={labelStyles}>
@@ -26,14 +38,7 @@ export default function LoginPage() {
           <label htmlFor="password" className={labelStyles}>
             Password
           </label>
-          <input
-            id="password"
-            name="password"
-            type="password"
-            autoComplete="current-password"
-            required
-            className={inputStyles}
-          />
+          <PasswordInput id="password" name="password" autoComplete="current-password" required />
         </div>
 
         {state?.error && (

@@ -1,5 +1,5 @@
 -- BanaTrack: admin user management (Tier 1, feature #1)
--- Run this in the Supabase SQL editor after schema.sql.
+-- Migration 002. Run this in the Supabase SQL editor after 001_schema.sql.
 -- Adds no new RLS policies; role updates still go through the existing
 -- "Admins can update any profile" policy.
 

@@ -1,6 +1,7 @@
 -- BanaTrack: promote the first admin.
--- Run once in the Supabase SQL editor. The account must already exist
--- (sign up in the app or add it under Authentication > Users first).
+-- One-off script, not a migration. Run once in the Supabase SQL editor after all
+-- migrations. The account must already exist (sign up in the app or add it
+-- under Authentication > Users first); edit the email below if needed.
 -- The SQL editor runs as the postgres role, so RLS doesn't block this.
 
 -- Upsert in case the profile row is missing (e.g. the account was created
