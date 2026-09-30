@@ -13,10 +13,13 @@ import {
   Menu,
   ScanSearch,
   ShieldCheck,
+  Users,
   X,
 } from "lucide-react";
+import { ROLE_LABELS, isRole } from "@/lib/roles";
 import { cx } from "./ui";
 
+// adminOnly hides the link; the page itself also redirects non-admins.
 const NAV = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
   { href: "/screening", label: "Disease Screening", icon: ScanSearch },
@@ -24,14 +27,8 @@ const NAV = [
   { href: "/review", label: "Review Queue", icon: ShieldCheck },
   { href: "/map", label: "Plantation Map", icon: Map },
   { href: "/reports", label: "Reports", icon: FileBarChart },
+  { href: "/users", label: "Users", icon: Users, adminOnly: true },
 ];
-
-const ROLE_LABELS: Record<string, string> = {
-  admin: "Admin",
-  supervisor: "Supervisor",
-  disease_in_charge: "Disease In-Charge",
-  field_personnel: "Field Personnel",
-};
 
 export function AppShell({
   user,
@@ -44,6 +41,7 @@ export function AppShell({
 }) {
   const pathname = usePathname();
   const [open, setOpen] = useState(false);
+  const nav = NAV.filter((n) => !n.adminOnly || user.role === "admin");
   const displayName = user.name || user.email;
   const initials = displayName
     .split(/[\s@.]+/)
@@ -74,7 +72,7 @@ export function AppShell({
       </div>
 
       <nav className="flex-1 space-y-1 px-3" aria-label="Main">
-        {NAV.map(({ href, label, icon: Icon }) => {
+        {nav.map(({ href, label, icon: Icon }) => {
           const active = pathname === href || pathname.startsWith(`${href}/`);
           return (
             <Link
@@ -110,7 +108,7 @@ export function AppShell({
           <div className="min-w-0 flex-1">
             <p className="truncate text-sm font-medium text-white">{displayName}</p>
             <p className="text-xs text-leaf-300">
-              {user.role ? ROLE_LABELS[user.role] ?? user.role : "No role assigned"}
+              {isRole(user.role) ? ROLE_LABELS[user.role] : user.role ?? "No role assigned"}
             </p>
           </div>
         </div>
@@ -127,7 +125,7 @@ export function AppShell({
     </div>
   );
 
-  const current = NAV.find((n) => pathname === n.href || pathname.startsWith(`${n.href}/`));
+  const current = nav.find((n) => pathname === n.href || pathname.startsWith(`${n.href}/`));
 
   return (
     <div className="flex min-h-screen flex-1">

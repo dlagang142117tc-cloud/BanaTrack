@@ -5,6 +5,43 @@ Update this at the end of each session.
 
 ---
 
+## Session: 2026-09-30 — Admin user management (branch `feature/user-management`)
+
+### Added
+
+- **`supabase/make-admin.sql`** — promotes `test@banatrack.com` to admin
+  (upsert, so it also works if the profile row is missing). Run once in the
+  SQL editor after that account has signed up.
+- **`supabase/user-management.sql`** — must be run after `schema.sql`:
+  - `list_users()` — security-definer function returning id, full name,
+    email (from `auth.users`), role, created_at. Raises unless the caller is
+    an admin; execute revoked from `anon`/`public`.
+  - `guard_role_change` trigger on `profiles` — blocks changing your own role
+    and demoting the last remaining admin, even via direct API calls. SQL
+    editor changes (no `auth.uid()`) skip the self rule so an admin can
+    always be restored there.
+  - No RLS policies were added or changed.
+- **`/users` page** — `web/src/app/(app)/users/`: server-side admin check
+  (non-admins are redirected to `/dashboard`), table of name / email / role /
+  joined date, per-row role dropdown + Save that calls the `updateUserRole`
+  server action. The action re-checks admin, blocks self-changes and
+  last-admin demotion, updates through RLS with the user's own session (no
+  service role key), and shows a success/error message under the row.
+- **Sidebar** — "Users" link shown only to admins (`adminOnly` in
+  `app-shell.tsx`).
+- **`web/src/lib/roles.ts`** — shared role list, labels, and `isRole()`
+  (the sidebar's role labels moved here).
+
+### Still missing / incomplete
+
+- Not yet tested against the live Supabase project — both SQL files need to
+  be run in the dashboard first.
+- Other screens are still visible to every role; only `/users` and the
+  dashboard governance card are admin-gated.
+- No invite / delete / deactivate user; admins can only change roles.
+
+---
+
 ## Session: 2026-09-25 — Full frontend (mock data)
 
 ### Added

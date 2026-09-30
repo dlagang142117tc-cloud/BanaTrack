@@ -14,8 +14,10 @@ for a banana plantation (Moko and Panama disease). See
 
 1. Create a Supabase project at https://supabase.com
 2. Run `supabase/schema.sql` in the Supabase SQL editor
-3. Copy `web/.env.local.example` to `web/.env.local` and fill in your project URL + anon key
-4. `cd web && npm run dev`
+3. Run `supabase/user-management.sql` in the SQL editor (admin user list + role-change safety rules)
+4. Copy `web/.env.local.example` to `web/.env.local` and fill in your project URL + anon key
+5. `cd web && npm run dev`
+6. Sign up in the app, then run `supabase/make-admin.sql` in the SQL editor (edit the email first if needed) to create the first admin
 
 Roles (Admin, Supervisor, Disease In-Charge, Field Personnel) live on the
 `profiles` table and are assigned by an admin after signup — new users
