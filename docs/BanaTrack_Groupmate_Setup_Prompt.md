@@ -22,4 +22,4 @@ Please:
 
 ---
 
-**One thing they'll still need from you directly (not from Claude Code):** the actual Supabase Project URL and anon key values, since those are secret and intentionally not included in the GitHub repo. Send those to them separately (chat app, email, etc.) so they can paste them into their own `.env.local` once Claude Code creates it.
+**One thing they'll still need from you directly (not from Claude Code):** the actual Supabase Project URL, anon key, and service role key (`SUPABASE_SERVICE_ROLE_KEY`, needed for the admin Users page) values, since those are secret and intentionally not included in the GitHub repo. The service role key has full database access — send it privately and never paste it anywhere public. Send those to them separately (chat app, email, etc.) so they can paste them into their own `.env.local` once Claude Code creates it.

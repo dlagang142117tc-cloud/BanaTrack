@@ -5,6 +5,33 @@ Update this at the end of each session.
 
 ---
 
+## Session: 2026-09-30 — Project cleanup (branch `feature/user-admin-actions`)
+
+### Changed
+
+- **SQL moved into a numbered run order** (older entries below use the old
+  paths):
+  - `supabase/schema.sql` → `supabase/migrations/001_schema.sql`
+  - `supabase/user-management.sql` → `supabase/migrations/002_user_management.sql`
+  - `supabase/admin-actions.sql` → `supabase/migrations/003_admin_actions.sql`
+  - `supabase/make-admin.sql` → `supabase/scripts/make-admin.sql` (one-off,
+    not a migration)
+  - New migrations go in `supabase/migrations/` as `004_…`, `005_…`.
+- **Planning docs moved to `docs/`** — `BanaTrack_ClaudeCode_BuildPrompt.md`,
+  `BanaTrack_Groupmate_Setup_Prompt.md` (the setup guide now mentions the
+  service role key).
+- **README** — setup steps list the three migrations in order, all three env
+  variables (including `SUPABASE_SERVICE_ROLE_KEY`), and the make-admin script.
+
+### Removed
+
+- Unused create-next-app files: `web/public/*.svg` (5 files, no references;
+  `web/public/` is now gone) and the boilerplate `web/README.md`.
+- Unused `macroF1` / `reviewerAgreement` fields from `modelGovernance` in
+  `mock-data.ts`.
+
+---
+
 ## Session: 2026-09-30 — Admin account actions (branch `feature/user-admin-actions`)
 
 ### Added
@@ -88,11 +115,15 @@ Update this at the end of each session.
 
 ### Still missing / incomplete
 
-- Not yet tested against the live Supabase project — both SQL files need to
-  be run in the dashboard first.
+- ~~Not yet tested against the live Supabase project — both SQL files need to
+  be run in the dashboard first.~~ **Resolved 2026-09-30:** SQL run on the
+  live project; admin and non-admin tests all passed.
 - Other screens are still visible to every role; only `/users` and the
   dashboard governance card are admin-gated.
-- No invite / delete / deactivate user; admins can only change roles.
+- ~~No invite / delete / deactivate user; admins can only change roles.~~
+  **Partly resolved 2026-09-30:** reset password, deactivate/reactivate, and
+  delete added (see the admin account actions session above). Invites are
+  still not supported.
 
 ---
 
@@ -134,6 +165,7 @@ Update this at the end of each session.
 - **Mock data** — all placeholder data is in `web/src/lib/mock-data.ts`. Every UI
   section that uses it shows a gold dashed `<SampleTag />` ("Sample data — not
   real", "Placeholder forecast", "Mock result — no AI model yet", etc.).
+  (The "Placeholder forecast" tag is gone — weather became real on 2026-09-27.)
 - **Proxy** — `/signup` added to public routes; signed-in users visiting
   `/login` or `/signup` are redirected to `/dashboard`.
 - **Dependency** — `lucide-react` (icons).
@@ -160,8 +192,9 @@ Update this at the end of each session.
   disease filter only changes which chart series show (stat tiles always show
   all). PDF export is `window.print()`, not react-pdf/jsPDF as planned.
 - **Role-based visibility is minimal** — only the dashboard governance card is
-  admin-gated. The sidebar and all screens show to every role. No admin
-  screen for assigning roles yet.
+  admin-gated. The sidebar and all screens show to every role. ~~No admin
+  screen for assigning roles yet.~~ **Resolved 2026-09-30:** admin-only
+  `/users` page assigns roles.
 - **Block layout is invented** — A–D × 1–6 grid with made-up areas/supervisors;
   replace with the plantation's real block list.
 - **Dark mode removed** — the app is light-only for now.
@@ -173,9 +206,11 @@ Update this at the end of each session.
   `emailRedirectTo`, so confirmation links rely on the Supabase project's
   Site URL setting and won't create a session in the app. Either add the
   callback route or disable email confirmation for testing.
-- **`web/.env.local.example` is not tracked** — `web/.gitignore` has `.env*`,
+- ~~**`web/.env.local.example` is not tracked** — `web/.gitignore` has `.env*`,
   which also ignores the example file that the README tells people to copy.
-  Add `!.env.local.example` to `.gitignore` and commit it.
+  Add `!.env.local.example` to `.gitignore` and commit it.~~ **Resolved
+  2026-09-30:** `!.env.local.example` added to `web/.gitignore`; the file is
+  tracked.
 - **Hard-coded "today"** — mock data and form defaults assume 2026-09-25
   (incident form date, report date range, forecast days).
 - **Dashboard assumes a user** — `dashboard/page.tsx` uses `user!.id`, relying on

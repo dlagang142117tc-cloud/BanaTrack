@@ -37,7 +37,7 @@ export async function changePassword(_prevState: unknown, formData: FormData) {
     return { error: error.code === "same_password" ? "Choose a password different from the temporary one." : error.message };
   }
 
-  // Users can't write this column themselves (see supabase/admin-actions.sql),
+  // Users can't write this column themselves (see supabase/migrations/003_admin_actions.sql),
   // so clear it with the service role, scoped to the verified user's own row.
   try {
     const { error: flagError } = await createAdminClient()

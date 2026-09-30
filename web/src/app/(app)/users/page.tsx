@@ -92,8 +92,8 @@ export default async function UsersPage() {
       <Card title="All users" description={error ? undefined : `${users.length} account${users.length === 1 ? "" : "s"}`}>
         {error ? (
           <p className="rounded-xl bg-red-50 p-4 text-sm text-red-700">
-            Couldn&apos;t load users: {error.message}. Make sure <code className="font-mono">supabase/user-management.sql</code>{" "}
-            and <code className="font-mono">supabase/admin-actions.sql</code> have been run in the Supabase SQL editor.
+            Couldn&apos;t load users: {error.message}. Make sure every file in{" "}
+            <code className="font-mono">supabase/migrations/</code> has been run, in order, in the Supabase SQL editor.
           </p>
         ) : (
           <div className="-mx-5 overflow-x-auto sm:-mx-6">

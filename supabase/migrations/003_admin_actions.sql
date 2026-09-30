@@ -1,5 +1,5 @@
 -- BanaTrack: admin account actions (reset password, deactivate, delete) + audit log
--- Run this in the Supabase SQL editor after schema.sql and user-management.sql.
+-- Migration 003. Run this in the Supabase SQL editor after 002_user_management.sql.
 
 -- ------------------------------------------------------------ profile flags
 

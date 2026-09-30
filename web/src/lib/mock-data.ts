@@ -291,7 +291,5 @@ export const monthlyIncidents: MonthlyCount[] = [
 export const modelGovernance = {
   activeVersion: "fusion-v0.0-mock",
   deployedOn: "Not deployed",
-  macroF1: 0.0,
   abstentionRate: 0.12,
-  reviewerAgreement: 0.0,
 };
