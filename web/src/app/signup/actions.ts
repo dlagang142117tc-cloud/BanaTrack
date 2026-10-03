@@ -1,5 +1,6 @@
 "use server";
 
+import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 
@@ -14,12 +15,14 @@ export async function signup(_prevState: unknown, formData: FormData) {
   }
 
   const supabase = await createClient();
+  const origin = (await headers()).get("origin") ?? process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000";
   // full_name is copied into public.profiles by the handle_new_user trigger;
   // role always starts as field_personnel and is assigned by an admin.
   const { data, error } = await supabase.auth.signUp({
     email,
     password,
-    options: { data: { full_name: fullName } },
+    // Only used when "Confirm email" is on in Supabase; ignored otherwise.
+    options: { data: { full_name: fullName }, emailRedirectTo: `${origin}/auth/callback` },
   });
 
   if (error) {

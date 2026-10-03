@@ -77,7 +77,7 @@ export default function ReviewQueuePage() {
     <div className="space-y-6">
       <PageHeader
         title="Review Queue"
-        description="AI-flagged cases sorted by case-review priority. Every decision is logged with the model version and a timestamp."
+        description="Sample cases sorted by case-review priority. Demo only: decisions stay on this page until you leave or refresh, and are not saved or logged yet."
         actions={<SampleTag label="Sample cases — not real" />}
       />
 

@@ -86,7 +86,7 @@ export default function ScreeningPage() {
     <div className="space-y-6">
       <PageHeader
         title="Disease Screening"
-        description="Upload a field photo to get a screening result, severity estimate, and case-review priority. Results are triage support only and always go to a human reviewer."
+        description="Upload a field photo to get a screening result, severity estimate, and case-review priority. Results are triage support only and need human confirmation. Demo only: results are sample output and are not sent to the review queue yet."
       />
 
       <div className="grid gap-6 lg:grid-cols-2">
@@ -317,7 +317,7 @@ function ResultPanel({ result }: { result: ScreeningResult }) {
       </div>
 
       <p className="text-[11px] text-muted">
-        Model <span className="font-mono">{result.modelVersion}</span> · Sent to review queue for confirmation.
+        Model <span className="font-mono">{result.modelVersion}</span> · Sample result: not sent to the review queue (demo only).
       </p>
     </div>
   );

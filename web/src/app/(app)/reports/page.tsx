@@ -12,6 +12,7 @@ import {
   labelStyles,
 } from "@/components/ui";
 import { blockRows, modelGovernance, monthlyIncidents, type MonthlyCount } from "@/lib/mock-data";
+import { monthStartIso, todayIso } from "@/lib/dates";
 
 // Validated categorical palette (dataviz validator, light surface): fixed order.
 const SERIES: { key: keyof Omit<MonthlyCount, "month">; label: string; color: string }[] = [
@@ -56,11 +57,11 @@ export default function ReportsPage() {
         <form onSubmit={generate} className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5 lg:items-end">
           <div className="flex flex-col gap-1.5">
             <label htmlFor="from" className={labelStyles}>From</label>
-            <input id="from" name="from" type="date" defaultValue="2026-04-01" className={inputStyles} />
+            <input id="from" name="from" type="date" defaultValue={monthStartIso(5)} className={inputStyles} />
           </div>
           <div className="flex flex-col gap-1.5">
             <label htmlFor="to" className={labelStyles}>To</label>
-            <input id="to" name="to" type="date" defaultValue="2026-09-25" className={inputStyles} />
+            <input id="to" name="to" type="date" defaultValue={todayIso()} className={inputStyles} />
           </div>
           <div className="flex flex-col gap-1.5">
             <label htmlFor="area" className={labelStyles}>Area</label>

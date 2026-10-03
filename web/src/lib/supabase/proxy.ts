@@ -2,6 +2,8 @@ import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 
 const PUBLIC_ROUTES = ["/login", "/signup"];
+// Reachable signed in or out: the email confirmation link creates the session.
+const OPEN_ROUTES = ["/auth/callback"];
 
 export async function updateSession(request: NextRequest) {
   let supabaseResponse = NextResponse.next({ request });
@@ -32,6 +34,10 @@ export async function updateSession(request: NextRequest) {
   const {
     data: { user },
   } = await supabase.auth.getUser();
+
+  if (OPEN_ROUTES.includes(request.nextUrl.pathname)) {
+    return supabaseResponse;
+  }
 
   const isPublicRoute = PUBLIC_ROUTES.includes(request.nextUrl.pathname);
 
