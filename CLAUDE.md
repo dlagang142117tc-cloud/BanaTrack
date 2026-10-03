@@ -13,14 +13,16 @@ authority: AI output always needs human confirmation.
 
 - Never commit or push to `main`. Never merge any PR. Only Denns merges into
   `main` after testing.
-- Before starting work: switch to `main`, pull, then create a new branch named
-  `feature/<short-description>`.
-- One task from `docs/web-roadmap.md` per branch.
+- Before starting work: switch to `main`, pull, then create a new branch:
+  - `feature/<short-description>` for a roadmap task (one task from
+    `docs/web-roadmap.md` per branch)
+  - `fix/<short-description>` for a bug fix
+  - `chore/<short-description>` for setup and cleanup
 - Do not create or edit SQL migration files without telling Denns first; Denns
   runs all SQL in Supabase. New migrations continue the numbering in
   `supabase/migrations/`.
 - Explain the plan before writing code, and wait for approval.
-- When done: run lint, type-check and build from `web/`, commit to the feature
+- When done: run lint, type-check and build from `web/`, commit to the working
   branch, push, open a PR into `main` (do NOT merge), and give a
   plain-language summary plus a test checklist.
 - Never commit `.env.local` or any keys.
@@ -41,7 +43,10 @@ demo behavior (not saved, not sent, no real model) must say so in the UI.
 
 ## Git
 
-- One feature per branch (`feature/…`, `chore/…`, `fix/…`); merge through a PR.
+- One task per branch, named as in "Team workflow rules":
+  `feature/<short-description>` (roadmap task), `fix/<short-description>`
+  (bug fix), `chore/<short-description>` (setup and cleanup).
+- Everything reaches `main` through a PR; only Denns merges.
 - Never commit `.env.local` or any other file with secrets.
 
 ## Secrets

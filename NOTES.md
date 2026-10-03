@@ -16,7 +16,8 @@ Update this at the end of each session.
   (last). One roadmap task per branch.
 - **"Team workflow rules" in root `CLAUDE.md`** — never commit/push to `main`
   or merge PRs (only Denns merges); start from a fresh `main` on a
-  `feature/<short-description>` branch; tell Denns before any SQL migration;
+  `feature/`, `fix/` or `chore/<short-description>` branch (roadmap task, bug
+  fix, setup/cleanup — the "Git" section says the same); tell Denns before any SQL migration;
   explain the plan and wait for approval; finish with lint/type-check/build,
   push, PR, summary and test checklist.
 
