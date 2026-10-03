@@ -12,7 +12,7 @@ export default function LoginPage({
 }: {
   searchParams: Promise<{ [key: string]: string | string[] | undefined }>;
 }) {
-  const { deactivated } = use(searchParams);
+  const { deactivated, confirm_error } = use(searchParams);
   const [state, formAction, pending] = useActionState(login, undefined);
 
   return (
@@ -23,6 +23,12 @@ export default function LoginPage({
       {deactivated && !state?.error && (
         <p className="mb-4 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">
           Your account has been deactivated. Contact an admin to restore access.
+        </p>
+      )}
+
+      {confirm_error && !state?.error && (
+        <p className="mb-4 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">
+          That confirmation link is invalid or has expired. Try signing in, or sign up again to get a new link.
         </p>
       )}
 

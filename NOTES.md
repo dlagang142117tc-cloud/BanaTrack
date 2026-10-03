@@ -5,6 +5,52 @@ Update this at the end of each session.
 
 ---
 
+## Session: 2026-10-03 — Phase 0 housekeeping (branch `chore/phase-0-housekeeping`)
+
+### Added
+
+- **`/auth/callback` route** (`web/src/app/auth/callback/route.ts`) — target of
+  Supabase confirmation emails. Accepts `?code=` (default template, PKCE) or
+  `?token_hash=&type=` (custom template); redirects to `next` (same-site paths
+  only, default `/dashboard`). Failures go to `/login?confirm_error=1`, which
+  shows an "invalid or expired link" message.
+- `signUp` now passes `emailRedirectTo: <origin>/auth/callback` (falls back to
+  `NEXT_PUBLIC_SITE_URL`, then `http://localhost:3000`). Ignored by Supabase
+  while "Confirm email" is off, so current behavior is unchanged.
+- `proxy.ts` lets `/auth/callback` through whether signed in or out.
+- **`web/src/lib/dates.ts`** — `todayIso()` / `monthStartIso(n)`, pinned to
+  Asia/Manila so server and browser render the same day.
+- **Root `CLAUDE.md`** — project rules: wording, one feature per branch, no
+  `.env.local` commits, service role key server-only, read/update `NOTES.md`
+  each session, build plan in `docs/`.
+
+### Changed
+
+- Incident form date defaults to today; report range defaults to the 1st of
+  the month five months back → today (was fixed 2026-04-01 → 2026-09-25).
+- Review Queue header no longer claims decisions are logged; Screening header
+  and result footer no longer claim results are sent to the review queue. Both
+  now say it's demo behavior.
+
+### Tested
+
+- Lint, type-check and build pass.
+- Manually: confirmation-OFF sign-up, auth redirects, new wording, date
+  defaults, no hydration warnings.
+
+### Pending tests
+
+- **Confirmation-ON sign-up not tested** — the demo accounts don't use real
+  inboxes. To test: add `<site>/auth/callback` to Supabase → Authentication →
+  URL Configuration → Redirect URLs, turn on "Confirm email", sign up with a
+  real inbox, and open the link **in the same browser** (the default PKCE link
+  fails in a different browser). Also check an expired/reused link lands on
+  `/login` with the error message.
+- When deployed, add the production `/auth/callback` URL to Supabase's
+  Redirect URLs (and optionally set `NEXT_PUBLIC_SITE_URL`).
+
+---
+
 ## Session: 2026-09-30 — Project cleanup (branch `feature/user-admin-actions`)
 
 ### Changed
@@ -201,18 +247,22 @@ Update this at the end of each session.
 
 ### Known issues
 
-- **Email-confirmation sign-up flow is incomplete** — there's no
+- ~~**Email-confirmation sign-up flow is incomplete** — there's no
   `/auth/callback` (or `/auth/confirm`) route and `signUp` doesn't pass
   `emailRedirectTo`, so confirmation links rely on the Supabase project's
   Site URL setting and won't create a session in the app. Either add the
-  callback route or disable email confirmation for testing.
+  callback route or disable email confirmation for testing.~~ **Resolved
+  2026-10-03:** `/auth/callback` added and `signUp` passes `emailRedirectTo`
+  (confirmation-ON flow still untested).
 - ~~**`web/.env.local.example` is not tracked** — `web/.gitignore` has `.env*`,
   which also ignores the example file that the README tells people to copy.
   Add `!.env.local.example` to `.gitignore` and commit it.~~ **Resolved
   2026-09-30:** `!.env.local.example` added to `web/.gitignore`; the file is
   tracked.
 - **Hard-coded "today"** — mock data and form defaults assume 2026-09-25
-  (incident form date, report date range, forecast days).
+  (incident form date, report date range, forecast days). **Partly resolved
+  2026-10-03:** the incident form and report range now default from today;
+  sample records in `mock-data.ts` still use fixed Sep dates.
 - **Dashboard assumes a user** — `dashboard/page.tsx` uses `user!.id`, relying on
   the `(app)/layout.tsx` redirect. Fine now, but fragile if the layout changes.
 - **Chart edge case** — in the Reports stacked chart, a month whose top series

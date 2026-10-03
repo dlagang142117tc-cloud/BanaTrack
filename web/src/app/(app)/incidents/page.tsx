@@ -22,6 +22,7 @@ import {
   symptomOptions,
   type Incident,
 } from "@/lib/mock-data";
+import { todayIso } from "@/lib/dates";
 
 const BLOCKS = blockRows.flatMap((r) => blockCols.map((c) => `${r}${c}`));
 
@@ -80,7 +81,7 @@ export default function IncidentsPage() {
         <form onSubmit={handleSubmit} className="space-y-5">
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
             <Field label="Date" htmlFor="date">
-              <input id="date" name="date" type="date" required defaultValue="2026-09-25" className={inputStyles} />
+              <input id="date" name="date" type="date" required defaultValue={todayIso()} className={inputStyles} />
             </Field>
             <Field label="Block / area" htmlFor="block">
               <select id="block" name="block" required className={inputStyles}>
