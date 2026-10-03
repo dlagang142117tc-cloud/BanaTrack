@@ -9,6 +9,22 @@ authority: AI output always needs human confirmation.
 - **Start:** read `NOTES.md` to see what's built, what's incomplete, and known issues.
 - **End:** add a dated entry to `NOTES.md` (what changed, what's left, known issues).
 
+## Team workflow rules
+
+- Never commit or push to `main`. Never merge any PR. Only Denns merges into
+  `main` after testing.
+- Before starting work: switch to `main`, pull, then create a new branch named
+  `feature/<short-description>`.
+- One task from `docs/web-roadmap.md` per branch.
+- Do not create or edit SQL migration files without telling Denns first; Denns
+  runs all SQL in Supabase. New migrations continue the numbering in
+  `supabase/migrations/`.
+- Explain the plan before writing code, and wait for approval.
+- When done: run lint, type-check and build from `web/`, commit to the feature
+  branch, push, open a PR into `main` (do NOT merge), and give a
+  plain-language summary plus a test checklist.
+- Never commit `.env.local` or any keys.
+
 ## Wording (UI text, docs, comments, commit messages)
 
 Use these terms:
@@ -36,8 +52,9 @@ demo behavior (not saved, not sent, no real model) must say so in the UI.
 
 ## Where things are
 
-- `docs/` — the build plan (`BanaTrack_ClaudeCode_BuildPrompt.md`) and
-  teammate setup guide. Check it before starting a new feature.
+- `docs/` — the build plan (`BanaTrack_ClaudeCode_BuildPrompt.md`), the web
+  task list (`web-roadmap.md`) and teammate setup guide. Check it before
+  starting a new feature.
 - `web/` — Next.js app. Read `web/CLAUDE.md` / `web/AGENTS.md` before writing
   code there (this Next.js version has breaking changes).
 - `supabase/migrations/` — SQL, run in numbered order. New ones go in as the
