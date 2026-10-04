@@ -18,11 +18,13 @@ const BAN_DURATION = "876000h"; // ~100 years
  * Tables that record a user's field work. Accounts with rows in any of these
  * must be deactivated instead of deleted, to keep the audit trail intact.
  * Add each table here once it exists, e.g.
- *   { table: "incidents", column: "reported_by" },
  *   { table: "screenings", column: "submitted_by" },
  *   { table: "review_actions", column: "reviewer_id" },
  */
-const ACTIVITY_TABLES: { table: string; column: string }[] = [];
+const ACTIVITY_TABLES: { table: string; column: string }[] = [
+  { table: "incidents", column: "reported_by" },
+  { table: "incident_photos", column: "uploaded_by" },
+];
 
 function fail(message: string): ActionState {
   return { ok: false, message };

@@ -146,3 +146,85 @@ function fmt(mm: number) {
 function joinList(items: string[]) {
   return items.length <= 1 ? items.join("") : `${items.slice(0, -1).join(", ")} and ${items.at(-1)}`;
 }
+
+// ---------------------------------------------------------------- Incident snapshot
+
+export interface WeatherSnapshot {
+  rain3dMm: number | null;
+  rain7dMm: number | null;
+  humidityMeanPct: number | null;
+  tempMeanC: number | null;
+  /** Which Open-Meteo API the numbers came from. */
+  source: "open-meteo-forecast" | "open-meteo-archive";
+}
+
+const SNAPSHOT_DAYS = 7;
+// The forecast API also serves recent past days (up to ~3 months back); older
+// dates come from the historical archive, which lags a few days behind.
+const FORECAST_API_DAYS_BACK = 60;
+
+function shiftIsoDate(iso: string, days: number) {
+  const d = new Date(`${iso}T00:00:00Z`);
+  d.setUTCDate(d.getUTCDate() + days);
+  return d.toISOString().slice(0, 10);
+}
+
+function sum(values: (number | null)[]) {
+  const known = values.filter((v): v is number => typeof v === "number");
+  return known.length ? Math.round(known.reduce((s, v) => s + v, 0) * 10) / 10 : null;
+}
+
+function mean(values: (number | null)[]) {
+  const known = values.filter((v): v is number => typeof v === "number");
+  return known.length ? Math.round((known.reduce((s, v) => s + v, 0) / known.length) * 10) / 10 : null;
+}
+
+/**
+ * Weather at the plantation for the 7 days up to and including `dateIso`
+ * (YYYY-MM-DD): 3-day and 7-day rainfall totals, mean relative humidity and
+ * mean temperature. Saved with each incident as context for later review.
+ * Returns null when Open-Meteo is unreachable or has no data for those days.
+ */
+export async function getWeatherSnapshot(dateIso: string, todayIso: string): Promise<WeatherSnapshot | null> {
+  const { latitude, longitude, timezone } = PLANTATION_LOCATION;
+  const useForecastApi = dateIso >= shiftIsoDate(todayIso, -FORECAST_API_DAYS_BACK);
+  const params = new URLSearchParams({
+    latitude: String(latitude),
+    longitude: String(longitude),
+    timezone,
+    start_date: shiftIsoDate(dateIso, -(SNAPSHOT_DAYS - 1)),
+    end_date: dateIso,
+    daily: "precipitation_sum,relative_humidity_2m_mean,temperature_2m_mean",
+  });
+  const base = useForecastApi
+    ? "https://api.open-meteo.com/v1/forecast"
+    : "https://archive-api.open-meteo.com/v1/archive";
+
+  try {
+    const res = await fetch(`${base}?${params}`, { cache: "no-store", signal: AbortSignal.timeout(8000) });
+    if (!res.ok) return null;
+    const { daily } = (await res.json()) as {
+      daily?: {
+        time: string[];
+        precipitation_sum: (number | null)[];
+        relative_humidity_2m_mean: (number | null)[];
+        temperature_2m_mean: (number | null)[];
+      };
+    };
+    if (!daily?.time?.length) return null;
+
+    const snapshot: WeatherSnapshot = {
+      rain3dMm: sum(daily.precipitation_sum.slice(-3)),
+      rain7dMm: sum(daily.precipitation_sum),
+      humidityMeanPct: mean(daily.relative_humidity_2m_mean),
+      tempMeanC: mean(daily.temperature_2m_mean),
+      source: useForecastApi ? "open-meteo-forecast" : "open-meteo-archive",
+    };
+    const empty = [snapshot.rain3dMm, snapshot.rain7dMm, snapshot.humidityMeanPct, snapshot.tempMeanC].every(
+      (v) => v === null,
+    );
+    return empty ? null : snapshot;
+  } catch {
+    return null;
+  }
+}

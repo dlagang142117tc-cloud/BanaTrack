@@ -5,6 +5,68 @@ Update this at the end of each session.
 
 ---
 
+## Session: 2026-10-04 — Incident Log saves real data (branch `feature/incident-log`)
+
+### Added
+
+- **`supabase/migrations/004_incident_log.sql`** (Denns runs it):
+  - `incidents` — date, block, suspected disease, severity, action, notes,
+    `reported_by` + `reporter_name` (set by a trigger from the session, never
+    from the client), and the weather snapshot columns (3-day / 7-day rain,
+    mean humidity, mean temperature, source, fetched-at).
+  - `incident_symptoms` (one row per symptom) and `incident_photos` (one row
+    per file, `uploaded_by`).
+  - Private storage bucket `incident-photos` (10 MB, JPEG/PNG/WebP/HEIC);
+    files live under `<user id>/<uuid>.<ext>`.
+  - Helpers `is_active_user()` and `can_manage_incidents()` (active
+    supervisor/admin). RLS: active users read and create (as themselves);
+    update/delete only for the reporter, supervisors and admins; deactivated
+    users get nothing. Same rules on the bucket. Updates are limited by column
+    grants to the observation fields (not reporter, dates, or weather).
+  - Values (block, symptom, severity…) are plain text — no DB constraints.
+- **`web/src/lib/incident-options.ts`** — the single place for the block list
+  (placeholder A1–D6; `mock-data.ts` re-exports it for the Map/Screening/
+  Reports previews), symptoms, severity scale, suspected diseases, actions and
+  photo limits. The server action validates against these lists.
+- **`getWeatherSnapshot()`** in `lib/weather.ts` — Open-Meteo daily data for
+  the 7 days up to the incident date (forecast API for the last 60 days,
+  archive API before that). Returns null on failure; the incident still saves.
+- **`/incidents`** rebuilt: server page loads real incidents (newest first,
+  latest 500) with signed thumbnail URLs (1 hour); `incident-form.tsx`
+  (personnel = signed-in user, read-only; up to 6 photos uploaded from the
+  browser straight to the bucket, then `createIncident` links them; uploads
+  are removed again if saving fails); `incident-history.tsx` (search, photo
+  thumbnails, weather column, delete with confirmation for permitted users).
+- `users/actions.ts` `ACTIVITY_TABLES` now lists `incidents.reported_by` and
+  `incident_photos.uploaded_by`, so accounts with incidents must be
+  deactivated instead of deleted.
+
+### Changed
+
+- Sample data / "Not saved" tags removed from the Incident Log only. Dashboard,
+  Map and Reports still use mock incidents (separate roadmap tasks).
+
+### Tested
+
+- Lint, type-check and build pass. Both Open-Meteo endpoints checked by hand.
+- **Not yet tested against Supabase** — needs `004_incident_log.sql` run first.
+
+### Known issues / left to do
+
+- No edit screen yet (the database already allows edits for the reporter,
+  supervisors and admins).
+- The weather snapshot is fetched by the server but inserted with the user's
+  session, so a user calling the API directly could insert their own weather
+  numbers. Acceptable for now; move the insert to the service role if it
+  matters.
+- If a photo file can't be removed after a failed save or delete, it stays in
+  the bucket as an orphan.
+- Thumbnails are the full-size images (no resizing); signed URLs expire after
+  1 hour, so a long-open page needs a refresh.
+- History search is client-side over the latest 500 incidents.
+
+---
+
 ## Session: 2026-10-03 — Team rules and web roadmap (branch `chore/team-rules`)
 
 ### Added
