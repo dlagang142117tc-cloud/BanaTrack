@@ -109,12 +109,8 @@ export const incidents: Incident[] = [
   },
 ];
 
-export const incidentStats = [
-  { label: "Open incidents", value: 23, delta: "+4 this week", tone: "warn" as const },
-  { label: "Blocks affected", value: 12, delta: "of 24 blocks", tone: "neutral" as const },
-  { label: "Awaiting review", value: 8, delta: "3 high priority", tone: "warn" as const },
-  { label: "Resolved (30 days)", value: 17, delta: "+6 vs. last month", tone: "good" as const },
-];
+// Dashboard "Awaiting review" card — sample until Screening and Review Queue saves cases.
+export const awaitingReviewSample = { value: 8, note: "3 high priority" };
 
 // ---------------------------------------------------------------- Screening
 
@@ -251,23 +247,7 @@ export const reviewCases: ReviewCase[] = [
   },
 ];
 
-// ---------------------------------------------------------------- Reports
-
-export interface MonthlyCount {
-  month: string;
-  moko: number;
-  panama: number;
-  unconfirmed: number;
-}
-
-export const monthlyIncidents: MonthlyCount[] = [
-  { month: "Apr", moko: 4, panama: 6, unconfirmed: 2 },
-  { month: "May", moko: 6, panama: 5, unconfirmed: 3 },
-  { month: "Jun", moko: 9, panama: 7, unconfirmed: 2 },
-  { month: "Jul", moko: 11, panama: 8, unconfirmed: 4 },
-  { month: "Aug", moko: 8, panama: 10, unconfirmed: 3 },
-  { month: "Sep", moko: 13, panama: 9, unconfirmed: 5 },
-];
+// ---------------------------------------------------------------- Model
 
 export const modelGovernance = {
   activeVersion: "fusion-v0.0-mock",

@@ -5,6 +5,58 @@ Update this at the end of each session.
 
 ---
 
+## Session: 2026-10-04 — Dashboard and Reports use real incidents (branch `feature/dashboard-reports-real-data`)
+
+Built on top of `feature/incident-log` (not yet merged when this started), so
+**the Incident Log PR must be merged first**. No new migration.
+
+### Added
+
+- **`web/src/lib/incident-stats.ts`** (server-only) — all incident counting:
+  - `getDashboardStats()` — last 30 days by incident date (today included):
+    incident count, change vs. the 30 days before, distinct blocks affected,
+    count at the top severity step, plus an all-time count for the empty state.
+  - `parseReportFilters()` / `getReport()` — validates `from`, `to`, `area`
+    (block row) and `disease` from the URL, filters in the database, counts
+    per month (every month in the range, zeros included). Max 24 months.
+  - Rows are read in pages of 1000 (Supabase's default row cap).
+- **`web/src/lib/report-series.ts`** — chart series built from
+  `SUSPECTED_DISEASES` in `incident-options.ts`, with the existing palette.
+- **Reports** is now a server page driven by the URL
+  (`/reports?from=&to=&area=&disease=`), so a report can be bookmarked or
+  shared. `report-filters.tsx` (form, pushes the URL) and `report-chart.tsx`
+  (stacked chart + data table, Export PDF button) are client components.
+
+### Changed
+
+- Dashboard stat cards: **Incidents**, **Blocks affected**, **High severity**
+  (all last 30 days, real) and **Awaiting review** (still sample, tagged).
+  "Open" / "Resolved" cards were dropped: incidents have no status column.
+- Reports: summary tiles follow the disease filter; labels say "suspected
+  disease, as recorded in the field" (not "screened pattern"); the fake model
+  footer is replaced by a source note. Empty states for "no report yet",
+  "no matching incidents", invalid filters and load errors.
+- Chart fix: zero-value segments are no longer drawn, so no stray 2px gaps
+  and the top segment always keeps its rounded cap (old known issue).
+- `mock-data.ts`: removed `incidentStats` and `monthlyIncidents`; kept
+  `awaitingReviewSample`. The Map still uses the sample incidents.
+
+### Tested
+
+- Lint, type-check and build pass.
+- **Not tested against Supabase yet** — needs `004_incident_log.sql` run and
+  a few saved incidents.
+
+### Known issues / left to do
+
+- Incidents whose `suspected_disease` is no longer in the options list are
+  left out of report counts.
+- Area filter is by placeholder block row (A–D); change it with the real
+  block list.
+- Export is still `window.print()` (Reports PDF export is its own task).
+
+---
+
 ## Session: 2026-10-04 — Incident Log saves real data (branch `feature/incident-log`)
 
 ### Added
