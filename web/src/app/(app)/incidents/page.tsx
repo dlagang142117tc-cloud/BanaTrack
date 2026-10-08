@@ -21,7 +21,9 @@ export default async function IncidentsPage() {
       .from("incidents")
       .select(
         `id, incident_date, block, suspected_disease, severity, action_taken, notes, reported_by, reporter_name,
+         status, resolved_at, last_edited_by_name, last_edited_at,
          weather_rain_3d_mm, weather_rain_7d_mm, weather_humidity_mean_pct, weather_temp_mean_c,
+         weather_window_start, weather_window_end, weather_source,
          incident_symptoms(symptom), incident_photos(id, storage_path, created_at)`,
       )
       .order("incident_date", { ascending: false })
@@ -49,6 +51,9 @@ export default async function IncidentsPage() {
     action: i.action_taken,
     notes: i.notes,
     personnel: i.reporter_name,
+    status: i.status,
+    resolvedAt: i.resolved_at,
+    lastEdit: i.last_edited_at ? { by: i.last_edited_by_name ?? "Unknown", at: i.last_edited_at } : null,
     symptoms: i.incident_symptoms.map((s) => s.symptom),
     photos: [...i.incident_photos]
       .sort((a, b) => a.created_at.localeCompare(b.created_at))
@@ -58,8 +63,12 @@ export default async function IncidentsPage() {
       rain7dMm: i.weather_rain_7d_mm,
       humidityMeanPct: i.weather_humidity_mean_pct,
       tempMeanC: i.weather_temp_mean_c,
+      windowStart: i.weather_window_start,
+      windowEnd: i.weather_window_end,
+      source: i.weather_source,
     },
-    canDelete: canManageAll || i.reported_by === user.id,
+    // Same rule as the database's update/delete policies.
+    canEdit: canManageAll || i.reported_by === user.id,
   }));
 
   const reporterName = profile?.full_name?.trim() || user.email || "You";

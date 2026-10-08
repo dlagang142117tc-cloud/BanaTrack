@@ -5,6 +5,90 @@ Update this at the end of each session.
 
 ---
 
+## Session: 2026-10-09 — Incident Log fixes after testing (branch `feature/incident-log`)
+
+### Added
+
+- **`supabase/migrations/005_incident_status_and_weather.sql`** (Denns runs
+  it; 004 is unchanged):
+  - `incidents.status` (`open` / `monitoring` / `resolved`, check constraint,
+    default `open`; existing rows become `open`) and `resolved_at` (set or
+    cleared by a trigger when status changes).
+  - `last_edited_by` (restrict), `last_edited_by_name`, `last_edited_at`,
+    set by the `track_incident_changes` trigger from the session on every
+    user edit. Service-role writes (weather) don't count as edits.
+  - `weather_window_start` / `weather_window_end`: the days the snapshot
+    covers.
+  - Column grants: users may insert only the observation columns
+    (date, block, disease, severity, action, notes, reported_by) and update
+    only status, block, suspected disease, severity, action and notes.
+    `incident_date` is locked so it always matches the weather window.
+  - `guard_incident_weather` trigger: any `authenticated`/`anon` insert or
+    update that sets or changes a weather column or the date is rejected
+    (a second layer behind the grants).
+  - `update_incident()` RPC: saves the incident row and replaces its symptoms
+    in one transaction. Runs as the caller, so RLS and grants still apply.
+- **Edit incident** (pencil button in the history table, for the reporter,
+  supervisors and admins): status, block, suspected disease, severity,
+  action, symptoms, notes. Server action `updateIncident` validates against
+  `incident-options.ts` (new `STATUSES` list) and calls the RPC.
+- **History table**: Status column (badge, resolved time); "Edited by X, time"
+  under the ID; weather cell shows the date window and source, and hovering
+  each label shows exactly what it covers.
+- **`web/scripts/recalculate-weather.mts`**: recalculates existing snapshots
+  with the service role and prints old → new values
+  (`node --env-file=.env.local scripts/recalculate-weather.mts
+  [--only-forecast] [--dry-run]`, run from `web/`). `tsconfig.json` now has
+  `allowImportingTsExtensions` so the script can import `lib/weather.ts`.
+- `users/activity.ts` (server-only): `ACTIVITY_TABLES` moved here, plus
+  `incidents.last_edited_by`. `/users` disables Delete upfront for users with
+  field records ("Has field records, deactivate instead"); the server action
+  still refuses on its own.
+
+### Changed
+
+- **Weather snapshot rule** (`getWeatherSnapshot`), D = incident date,
+  Asia/Manila days, inclusive: rain 3d = total D−2…D; rain 7d = total
+  D−6…D; humidity and temperature = mean of the daily means D−6…D. Source:
+  Open-Meteo historical archive; if the archive doesn't have every day yet
+  (it ends yesterday or earlier), the forecast endpoint's `past_days`. Stored
+  as `open-meteo-archive` or `open-meteo-forecast-past-days`. (Before, any
+  date in the last 60 days came from the forecast API.)
+- **Weather is server-only**: `createIncident` inserts the incident with the
+  user's session (no weather), then `attachWeather` writes the snapshot with
+  the service role client.
+
+### Tested
+
+- Lint, type-check and build pass. `getWeatherSnapshot` checked against live
+  Open-Meteo for today, yesterday, last week and March (archive sums match
+  the raw API).
+- 005 run in Supabase (2026-10-09). Recalculation script run: INC-0001
+  (2026-10-07) now uses `open-meteo-archive`, window 2026-10-01…2026-10-07
+  (rain 3d 28.9 → 30.0 mm, rain 7d 69.2 → 70.3 mm, humidity 88.6 → 88.3%,
+  temp 26.7 → 26.8 °C); its symptoms and photos are unchanged, and the
+  recalculation wasn't recorded as a user edit.
+- **Manual tests, 2026-10-09 (partly done):** passed: status, editing,
+  resolve/reopen, search. **Left:** other roles (field user can't edit
+  others' incidents; supervisor/admin can), new incidents dated today and a
+  week ago (weather source/window), Users page Delete button. Also not yet
+  run: weather/date changes via the API rejected, and saving without
+  `SUPABASE_SERVICE_ROLE_KEY`.
+
+### Known issues / left to do
+
+- **Weather snapshots need `SUPABASE_SERVICE_ROLE_KEY`** in `web/.env.local`
+  (and in production). Without it, incidents still save but with no weather
+  snapshot; the success message says so.
+- **Same-day incidents** use forecast hours for the rest of that day
+  (`open-meteo-forecast-past-days`). Re-run
+  `scripts/recalculate-weather.mts --only-forecast` a few days later to
+  replace them with archive data.
+- Edits don't keep a history, only the last editor and time.
+- The script prints a harmless Node warning (`MODULE_TYPELESS_PACKAGE_JSON`).
+
+---
+
 ## Session: 2026-10-04 — Incident Log saves real data (branch `feature/incident-log`)
 
 ### Added
@@ -53,12 +137,12 @@ Update this at the end of each session.
 
 ### Known issues / left to do
 
-- No edit screen yet (the database already allows edits for the reporter,
-  supervisors and admins).
-- The weather snapshot is fetched by the server but inserted with the user's
+- ~~No edit screen yet (the database already allows edits for the reporter,
+  supervisors and admins).~~ **Resolved 2026-10-09:** edit dialog + status.
+- ~~The weather snapshot is fetched by the server but inserted with the user's
   session, so a user calling the API directly could insert their own weather
   numbers. Acceptable for now; move the insert to the service role if it
-  matters.
+  matters.~~ **Resolved 2026-10-09:** written by the service role only (005).
 - If a photo file can't be removed after a failed save or delete, it stays in
   the bucket as an orphan.
 - Thumbnails are the full-size images (no resizing); signed URLs expire after

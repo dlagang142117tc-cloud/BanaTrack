@@ -44,6 +44,17 @@ export const ACTIONS = [
   "No action yet",
 ];
 
+/**
+ * Follow-up status of an incident. Unlike the lists above, these values are
+ * fixed by a check constraint in 005_incident_status_and_weather.sql — change
+ * both together. New incidents start as "open".
+ */
+export const STATUSES = [
+  { value: "open", label: "Open" },
+  { value: "monitoring", label: "Monitoring" },
+  { value: "resolved", label: "Resolved" },
+];
+
 export const MAX_PHOTOS = 6;
 export const MAX_PHOTO_BYTES = 10 * 1024 * 1024; // keep in sync with the bucket limit in 004_incident_log.sql
 export const PHOTO_TYPES = ["image/jpeg", "image/png", "image/webp", "image/heic", "image/heif"];

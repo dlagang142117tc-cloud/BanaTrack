@@ -22,6 +22,7 @@ for the full project plan.
    - `002_user_management.sql` — admin user list + role-change safety rules
    - `003_admin_actions.sql` — account flags, deactivation/last-admin rules, audit log
    - `004_incident_log.sql` — incidents, symptoms, photos (private `incident-photos` bucket), weather snapshot
+   - `005_incident_status_and_weather.sql` — incident status and editing, edit tracking, server-only weather
 3. Copy `web/.env.local.example` to `web/.env.local` and fill in all three values from
    Supabase **Project Settings > API Keys**:
    - `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_ANON_KEY`

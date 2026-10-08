@@ -9,7 +9,18 @@ import { deleteUserAccount, resetUserPassword, setUserActive, type ActionState }
 
 type ServerAction = (prev: ActionState, formData: FormData) => Promise<ActionState>;
 
-export function UserActions({ userId, email, deactivated }: { userId: string; email: string; deactivated: boolean }) {
+export function UserActions({
+  userId,
+  email,
+  deactivated,
+  hasRecords,
+}: {
+  userId: string;
+  email: string;
+  deactivated: boolean;
+  /** Has field records: delete is refused on the server, so it's disabled here too. */
+  hasRecords: boolean;
+}) {
   const [result, setResult] = useState<ActionState>(undefined);
   const [typedEmail, setTypedEmail] = useState("");
 
@@ -66,38 +77,51 @@ export function UserActions({ userId, email, deactivated }: { userId: string; em
           </ActionDialog>
         )}
 
-        <ActionDialog
-          userId={userId}
-          action={deleteUserAccount}
-          onSuccess={setResult}
-          onClose={() => setTypedEmail("")}
-          trigger={<><Trash2 className="size-3.5" aria-hidden /> Delete</>}
-          title="Permanently delete account"
-          description={
-            <>
-              This removes <strong className="text-ink">{email}</strong> and cannot be undone. To keep their history, deactivate
-              the account instead.
-            </>
-          }
-          submitLabel="Delete permanently"
-          danger
-          canSubmit={typedEmail.trim().toLowerCase() === email.toLowerCase()}
-        >
-          <div className="flex flex-col gap-1.5">
-            <label htmlFor={`del-${userId}`} className={labelStyles}>
-              Type <span className="font-mono">{email}</span> to confirm
-            </label>
-            <input
-              id={`del-${userId}`}
-              name="confirm_email"
-              autoComplete="off"
-              value={typedEmail}
-              onChange={(e) => setTypedEmail(e.target.value)}
-              className={inputStyles}
-            />
-          </div>
-        </ActionDialog>
+        {hasRecords ? (
+          <button
+            type="button"
+            disabled
+            title="Has field records, deactivate instead"
+            className={cx(buttonStyles.secondary, "px-2.5 py-1 text-xs")}
+          >
+            <Trash2 className="size-3.5" aria-hidden /> Delete
+          </button>
+        ) : (
+          <ActionDialog
+            userId={userId}
+            action={deleteUserAccount}
+            onSuccess={setResult}
+            onClose={() => setTypedEmail("")}
+            trigger={<><Trash2 className="size-3.5" aria-hidden /> Delete</>}
+            title="Permanently delete account"
+            description={
+              <>
+                This removes <strong className="text-ink">{email}</strong> and cannot be undone. To keep their history, deactivate
+                the account instead.
+              </>
+            }
+            submitLabel="Delete permanently"
+            danger
+            canSubmit={typedEmail.trim().toLowerCase() === email.toLowerCase()}
+          >
+            <div className="flex flex-col gap-1.5">
+              <label htmlFor={`del-${userId}`} className={labelStyles}>
+                Type <span className="font-mono">{email}</span> to confirm
+              </label>
+              <input
+                id={`del-${userId}`}
+                name="confirm_email"
+                autoComplete="off"
+                value={typedEmail}
+                onChange={(e) => setTypedEmail(e.target.value)}
+                className={inputStyles}
+              />
+            </div>
+          </ActionDialog>
+        )}
       </div>
+
+      {hasRecords && <p className="text-xs text-muted">Has field records, deactivate instead.</p>}
 
       {result && (
         <p role="status" className={cx("text-xs", result.ok ? "text-leaf-700" : "text-red-700")}>

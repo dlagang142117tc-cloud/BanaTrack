@@ -1,6 +1,7 @@
 /**
  * Real 7-day forecast from Open-Meteo (https://open-meteo.com) — free, no API
- * key. Fetched server-side and cached for 30 minutes.
+ * key. Fetched server-side and cached for 30 minutes. Also the past-weather
+ * snapshot saved with each incident (getWeatherSnapshot, below).
  */
 
 export type WeatherCondition = "sun" | "partly" | "cloud" | "rain" | "storm";
@@ -149,24 +150,44 @@ function joinList(items: string[]) {
 
 // ---------------------------------------------------------------- Incident snapshot
 
+export type WeatherSource = "open-meteo-archive" | "open-meteo-forecast-past-days";
+
 export interface WeatherSnapshot {
+  /** Total rainfall, windowEnd − 2 days … windowEnd. */
   rain3dMm: number | null;
+  /** Total rainfall, windowStart … windowEnd (7 days). */
   rain7dMm: number | null;
+  /** Mean of the 7 daily mean relative humidities, windowStart … windowEnd. */
   humidityMeanPct: number | null;
+  /** Mean of the 7 daily mean temperatures, windowStart … windowEnd. */
   tempMeanC: number | null;
-  /** Which Open-Meteo API the numbers came from. */
-  source: "open-meteo-forecast" | "open-meteo-archive";
+  /** YYYY-MM-DD, plantation time, inclusive: incident date − 6 days. */
+  windowStart: string;
+  /** YYYY-MM-DD, plantation time, inclusive: the incident date. */
+  windowEnd: string;
+  source: WeatherSource;
 }
 
-const SNAPSHOT_DAYS = 7;
-// The forecast API also serves recent past days (up to ~3 months back); older
-// dates come from the historical archive, which lags a few days behind.
-const FORECAST_API_DAYS_BACK = 60;
+export const SNAPSHOT_DAYS = 7;
+// Open-Meteo's forecast endpoint serves at most 92 past days.
+const MAX_PAST_DAYS = 92;
+const SNAPSHOT_FIELDS = "precipitation_sum,relative_humidity_2m_mean,temperature_2m_mean";
 
-function shiftIsoDate(iso: string, days: number) {
+interface SnapshotDaily {
+  time: string[];
+  precipitation_sum: (number | null)[];
+  relative_humidity_2m_mean: (number | null)[];
+  temperature_2m_mean: (number | null)[];
+}
+
+export function shiftIsoDate(iso: string, days: number) {
   const d = new Date(`${iso}T00:00:00Z`);
   d.setUTCDate(d.getUTCDate() + days);
   return d.toISOString().slice(0, 10);
+}
+
+function daysBetween(fromIso: string, toIso: string) {
+  return Math.round((Date.parse(`${toIso}T00:00:00Z`) - Date.parse(`${fromIso}T00:00:00Z`)) / 86_400_000);
 }
 
 function sum(values: (number | null)[]) {
@@ -179,52 +200,83 @@ function mean(values: (number | null)[]) {
   return known.length ? Math.round((known.reduce((s, v) => s + v, 0) / known.length) * 10) / 10 : null;
 }
 
+async function fetchDaily(url: string): Promise<SnapshotDaily | null> {
+  try {
+    const res = await fetch(url, { cache: "no-store", signal: AbortSignal.timeout(8000) });
+    if (!res.ok) return null;
+    const { daily } = (await res.json()) as { daily?: SnapshotDaily };
+    return daily?.time?.length ? daily : null;
+  } catch {
+    return null;
+  }
+}
+
+/** The window's days only, in order; null unless every day is present. */
+function pickWindow(daily: SnapshotDaily, start: string, end: string) {
+  const rows = daily.time
+    .map((date, i) => ({
+      date,
+      rain: daily.precipitation_sum[i] ?? null,
+      humidity: daily.relative_humidity_2m_mean[i] ?? null,
+      temp: daily.temperature_2m_mean[i] ?? null,
+    }))
+    .filter((r) => r.date >= start && r.date <= end);
+  return rows.length === SNAPSHOT_DAYS ? rows : null;
+}
+
 /**
- * Weather at the plantation for the 7 days up to and including `dateIso`
- * (YYYY-MM-DD): 3-day and 7-day rainfall totals, mean relative humidity and
- * mean temperature. Saved with each incident as context for later review.
+ * Weather at the plantation for the 7 days BEFORE AND INCLUDING `dateIso`
+ * (YYYY-MM-DD, plantation time): 3-day and 7-day rainfall totals, mean
+ * relative humidity and mean temperature. Saved with each incident as context
+ * for later review — never forecast days after the incident.
+ *
+ * Source: Open-Meteo's historical archive. When the archive doesn't have every
+ * day of the window yet (it lags behind by a day or more), the forecast
+ * endpoint's `past_days` data is used instead. For an incident dated today,
+ * that day's values include forecast hours that haven't happened yet; re-run
+ * `web/scripts/recalculate-weather.mts` later to replace them.
+ *
  * Returns null when Open-Meteo is unreachable or has no data for those days.
  */
 export async function getWeatherSnapshot(dateIso: string, todayIso: string): Promise<WeatherSnapshot | null> {
   const { latitude, longitude, timezone } = PLANTATION_LOCATION;
-  const useForecastApi = dateIso >= shiftIsoDate(todayIso, -FORECAST_API_DAYS_BACK);
-  const params = new URLSearchParams({
-    latitude: String(latitude),
-    longitude: String(longitude),
-    timezone,
-    start_date: shiftIsoDate(dateIso, -(SNAPSHOT_DAYS - 1)),
-    end_date: dateIso,
-    daily: "precipitation_sum,relative_humidity_2m_mean,temperature_2m_mean",
-  });
-  const base = useForecastApi
-    ? "https://api.open-meteo.com/v1/forecast"
-    : "https://archive-api.open-meteo.com/v1/archive";
+  const windowStart = shiftIsoDate(dateIso, -(SNAPSHOT_DAYS - 1));
+  const windowEnd = dateIso;
+  const base = { latitude: String(latitude), longitude: String(longitude), timezone, daily: SNAPSHOT_FIELDS };
 
-  try {
-    const res = await fetch(`${base}?${params}`, { cache: "no-store", signal: AbortSignal.timeout(8000) });
-    if (!res.ok) return null;
-    const { daily } = (await res.json()) as {
-      daily?: {
-        time: string[];
-        precipitation_sum: (number | null)[];
-        relative_humidity_2m_mean: (number | null)[];
-        temperature_2m_mean: (number | null)[];
-      };
-    };
-    if (!daily?.time?.length) return null;
-
-    const snapshot: WeatherSnapshot = {
-      rain3dMm: sum(daily.precipitation_sum.slice(-3)),
-      rain7dMm: sum(daily.precipitation_sum),
-      humidityMeanPct: mean(daily.relative_humidity_2m_mean),
-      tempMeanC: mean(daily.temperature_2m_mean),
-      source: useForecastApi ? "open-meteo-forecast" : "open-meteo-archive",
-    };
-    const empty = [snapshot.rain3dMm, snapshot.rain7dMm, snapshot.humidityMeanPct, snapshot.tempMeanC].every(
-      (v) => v === null,
+  let source: WeatherSource = "open-meteo-archive";
+  let rows = null;
+  if (windowEnd < todayIso) {
+    const archive = await fetchDaily(
+      `https://archive-api.open-meteo.com/v1/archive?${new URLSearchParams({ ...base, start_date: windowStart, end_date: windowEnd })}`,
     );
-    return empty ? null : snapshot;
-  } catch {
-    return null;
+    rows = archive && pickWindow(archive, windowStart, windowEnd);
+    // Recent days can be missing (null) until the archive catches up.
+    if (rows?.some((r) => r.rain === null || r.humidity === null || r.temp === null)) rows = null;
   }
+
+  if (!rows) {
+    const pastDays = daysBetween(windowStart, todayIso);
+    if (pastDays > MAX_PAST_DAYS) return null;
+    source = "open-meteo-forecast-past-days";
+    const recent = await fetchDaily(
+      `https://api.open-meteo.com/v1/forecast?${new URLSearchParams({ ...base, past_days: String(pastDays), forecast_days: "1" })}`,
+    );
+    rows = recent && pickWindow(recent, windowStart, windowEnd);
+  }
+  if (!rows) return null;
+
+  const snapshot: WeatherSnapshot = {
+    rain3dMm: sum(rows.slice(-3).map((r) => r.rain)),
+    rain7dMm: sum(rows.map((r) => r.rain)),
+    humidityMeanPct: mean(rows.map((r) => r.humidity)),
+    tempMeanC: mean(rows.map((r) => r.temp)),
+    windowStart,
+    windowEnd,
+    source,
+  };
+  const empty = [snapshot.rain3dMm, snapshot.rain7dMm, snapshot.humidityMeanPct, snapshot.tempMeanC].every(
+    (v) => v === null,
+  );
+  return empty ? null : snapshot;
 }

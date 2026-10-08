@@ -16,9 +16,9 @@ import {
   PHOTO_TYPES,
   SEVERITIES,
   SUSPECTED_DISEASES,
-  SYMPTOMS,
 } from "@/lib/incident-options";
 import { createIncident, type IncidentActionResult } from "./actions";
+import { SymptomPicker } from "./symptom-picker";
 
 interface PickedPhoto {
   key: string;
@@ -206,28 +206,7 @@ export function IncidentForm({ userId, reporterName }: { userId: string; reporte
 
           <fieldset>
             <legend className={labelStyles}>Symptoms observed</legend>
-            <div className="mt-2 flex flex-wrap gap-2">
-              {SYMPTOMS.map((s) => {
-                const on = symptoms.includes(s);
-                return (
-                  <button
-                    key={s}
-                    type="button"
-                    onClick={() => toggleSymptom(s)}
-                    aria-pressed={on}
-                    className={cx(
-                      "inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-medium transition-colors",
-                      on
-                        ? "border-leaf-600 bg-leaf-600 text-white"
-                        : "border-line bg-white text-ink hover:border-leaf-300 hover:bg-leaf-50",
-                    )}
-                  >
-                    {on && <Check className="size-3" aria-hidden />}
-                    {s}
-                  </button>
-                );
-              })}
-            </div>
+            <SymptomPicker selected={symptoms} onToggle={toggleSymptom} />
           </fieldset>
 
           <div>
