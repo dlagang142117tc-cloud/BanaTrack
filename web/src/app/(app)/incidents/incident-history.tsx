@@ -11,6 +11,7 @@ import {
   STATUSES,
   SUSPECTED_DISEASES,
   incidentCode,
+  symptomsProblem,
 } from "@/lib/incident-options";
 import type { Severity } from "@/lib/mock-data";
 import { deleteIncident, updateIncident, type IncidentActionResult } from "./actions";
@@ -155,8 +156,11 @@ export function IncidentHistory({ rows, loadError, limit }: { rows: IncidentRow[
               <th className="px-3 py-2.5 font-medium">Severity</th>
               <th className="px-3 py-2.5 font-medium">Personnel</th>
               <th className="px-3 py-2.5 font-medium">Action taken</th>
-              <th className="px-3 py-2.5 font-medium" title="Open-Meteo, the 7 days before and including the incident date">
-                Weather (7 days)
+              <th
+                className="px-3 py-2.5 font-medium"
+                title="Rain, humidity and temperature for the 7 days up to and including the incident date."
+              >
+                Weather (7 days before)
               </th>
               <th className="px-5 py-2.5 sm:px-6">
                 <span className="sr-only">Actions</span>
@@ -310,17 +314,22 @@ function EditIncidentForm({
   onSaved: (result: IncidentActionResult) => void;
 }) {
   const [symptoms, setSymptoms] = useState(row.symptoms);
+  const [symptomError, setSymptomError] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
 
-  function toggleSymptom(s: string) {
-    setSymptoms((cur) => (cur.includes(s) ? cur.filter((x) => x !== s) : [...cur, s]));
+  function changeSymptoms(next: string[]) {
+    setSymptoms(next);
+    setSymptomError(null);
   }
 
   function handleSubmit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
     const data = new FormData(e.currentTarget);
     setError(null);
+    const symptomProblem = symptomsProblem(symptoms);
+    setSymptomError(symptomProblem);
+    if (symptomProblem) return;
     startTransition(async () => {
       const res = await updateIncident({
         id: row.id,
@@ -390,7 +399,7 @@ function EditIncidentForm({
 
         <fieldset>
           <legend className={labelStyles}>Symptoms observed</legend>
-          <SymptomPicker selected={symptoms} onToggle={toggleSymptom} />
+          <SymptomPicker selected={symptoms} onChange={changeSymptoms} error={symptomError} />
         </fieldset>
 
         <Field label="Notes" htmlFor={`${p}-notes`}>

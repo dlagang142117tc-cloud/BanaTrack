@@ -74,6 +74,39 @@ Update this at the end of each session.
   week ago (weather source/window), Users page Delete button. Also not yet
   run: weather/date changes via the API rejected, and saving without
   `SUPABASE_SERVICE_ROLE_KEY`.
+- **Later on 2026-10-09:** Denns passed all the manual tests left above
+  (except saving without the service role key). API permission check run
+  with a temporary Field Personnel user
+  signed in with the anon key, on an incident they reported: updating
+  `weather_rain_7d_mm`, updating `incident_date`, and inserting with a weather
+  value were all rejected (HTTP 403, `42501 permission denied for table
+  incidents`, from the column grants; the trigger layer is never reached).
+  The row was unchanged. The temp user and its incident (id 5) were deleted,
+  so incident ids skip 5 (the next one is INC-0006).
+- **"No visible symptoms" and weather header** (Denns tested both,
+  2026-10-09, all passed):
+  - `incident-options.ts`: `NO_VISIBLE_SYMPTOMS` ("No visible symptoms") and
+    `symptomsProblem()`, the shared rule: at least one symptom or "No visible
+    symptoms", never both. Stored as an ordinary `incident_symptoms` row, so
+    no migration.
+  - `SymptomPicker` now takes `onChange` and handles the exclusivity itself
+    (ticking "No visible symptoms" clears the symptoms; ticking a symptom
+    clears it), and shows an `error` under the chips. Used by the new-incident
+    form and the edit dialog; both block saving with the error if nothing is
+    ticked. `createIncident` / `updateIncident` check the same rule on the
+    server.
+  - Existing incidents are unchanged; editing one that has no symptoms now
+    requires choosing a symptom or "No visible symptoms".
+  - History header renamed to "Weather (7 days before)" with the tooltip "Rain,
+    humidity and temperature for the 7 days up to and including the incident
+    date."
+  - Lint, type-check and build pass.
+  - **Left for later:** the symptom rule isn't enforced in the database; a
+    direct call to `update_incident()` (or inserts into `incident_symptoms`)
+    can still leave an incident with no symptoms. Would need a migration
+    (e.g. a deferred constraint trigger).
+  - **Left for later:** the incident history table is wide and needs
+    sideways scrolling on phones.
 
 ### Known issues / left to do
 

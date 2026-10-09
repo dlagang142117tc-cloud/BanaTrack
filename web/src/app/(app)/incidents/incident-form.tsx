@@ -16,6 +16,7 @@ import {
   PHOTO_TYPES,
   SEVERITIES,
   SUSPECTED_DISEASES,
+  symptomsProblem,
 } from "@/lib/incident-options";
 import { createIncident, type IncidentActionResult } from "./actions";
 import { SymptomPicker } from "./symptom-picker";
@@ -45,6 +46,7 @@ function photoType(file: File) {
 
 export function IncidentForm({ userId, reporterName }: { userId: string; reporterName: string }) {
   const [symptoms, setSymptoms] = useState<string[]>([]);
+  const [symptomError, setSymptomError] = useState<string | null>(null);
   const [photos, setPhotos] = useState<PickedPhoto[]>([]);
   const [photoError, setPhotoError] = useState<string | null>(null);
   const [result, setResult] = useState<IncidentActionResult | null>(null);
@@ -59,8 +61,9 @@ export function IncidentForm({ userId, reporterName }: { userId: string; reporte
   // Free the preview blobs when leaving the page.
   useEffect(() => () => photosRef.current.forEach((p) => URL.revokeObjectURL(p.preview)), []);
 
-  function toggleSymptom(s: string) {
-    setSymptoms((cur) => (cur.includes(s) ? cur.filter((x) => x !== s) : [...cur, s]));
+  function changeSymptoms(next: string[]) {
+    setSymptoms(next);
+    setSymptomError(null);
   }
 
   function addPhotos(files: FileList | null) {
@@ -98,6 +101,9 @@ export function IncidentForm({ userId, reporterName }: { userId: string; reporte
     const form = e.currentTarget;
     const data = new FormData(form);
     setResult(null);
+    const symptomProblem = symptomsProblem(symptoms);
+    setSymptomError(symptomProblem);
+    if (symptomProblem) return;
 
     startTransition(async () => {
       const supabase = createClient();
@@ -206,7 +212,7 @@ export function IncidentForm({ userId, reporterName }: { userId: string; reporte
 
           <fieldset>
             <legend className={labelStyles}>Symptoms observed</legend>
-            <SymptomPicker selected={symptoms} onToggle={toggleSymptom} />
+            <SymptomPicker selected={symptoms} onChange={changeSymptoms} error={symptomError} />
           </fieldset>
 
           <div>

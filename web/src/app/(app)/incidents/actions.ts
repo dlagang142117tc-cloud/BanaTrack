@@ -11,12 +11,14 @@ import {
   BLOCKS,
   MAX_NOTES_LENGTH,
   MAX_PHOTOS,
+  NO_VISIBLE_SYMPTOMS,
   PHOTO_BUCKET,
   SEVERITIES,
   STATUSES,
   SUSPECTED_DISEASES,
   SYMPTOMS,
   incidentCode,
+  symptomsProblem,
 } from "@/lib/incident-options";
 
 export type IncidentActionResult = { ok: true; message: string } | { ok: false; message: string };
@@ -84,10 +86,13 @@ function validateObservation(input: Omit<IncidentEditInput, "id" | "status">): s
   if (typeof input.notes !== "string" || input.notes.length > MAX_NOTES_LENGTH) {
     return `Notes can be at most ${MAX_NOTES_LENGTH} characters.`;
   }
-  if (!Array.isArray(input.symptoms) || !input.symptoms.every((s) => SYMPTOMS.includes(s))) {
+  if (
+    !Array.isArray(input.symptoms) ||
+    !input.symptoms.every((s) => SYMPTOMS.includes(s) || s === NO_VISIBLE_SYMPTOMS)
+  ) {
     return "Choose symptoms from the list.";
   }
-  return null;
+  return symptomsProblem([...new Set(input.symptoms)]);
 }
 
 function validate(input: NewIncidentInput, userId: string, today: string): string | null {
