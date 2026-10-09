@@ -21,6 +21,21 @@ export const SYMPTOMS = [
   "Stunted growth",
 ];
 
+/**
+ * Chosen instead of any symptom when the plant was checked and nothing was
+ * seen. It can't be combined with the symptoms above. Stored like a symptom.
+ */
+export const NO_VISIBLE_SYMPTOMS = "No visible symptoms";
+
+/** The symptom rule shared by the forms and the server: null when the list is fine. */
+export function symptomsProblem(symptoms: string[]): string | null {
+  if (!symptoms.length) return `Choose at least one symptom, or "${NO_VISIBLE_SYMPTOMS}".`;
+  if (symptoms.includes(NO_VISIBLE_SYMPTOMS) && symptoms.length > 1) {
+    return `"${NO_VISIBLE_SYMPTOMS}" can't be combined with other symptoms.`;
+  }
+  return null;
+}
+
 /** Observed severity, lowest first. `value` is what gets stored. */
 export const SEVERITIES = [
   { value: "low", label: "Low" },
@@ -42,6 +57,17 @@ export const ACTIONS = [
   "Tools disinfected",
   "Sample sent to lab",
   "No action yet",
+];
+
+/**
+ * Follow-up status of an incident. Unlike the lists above, these values are
+ * fixed by a check constraint in 005_incident_status_and_weather.sql — change
+ * both together. New incidents start as "open".
+ */
+export const STATUSES = [
+  { value: "open", label: "Open" },
+  { value: "monitoring", label: "Monitoring" },
+  { value: "resolved", label: "Resolved" },
 ];
 
 export const MAX_PHOTOS = 6;
