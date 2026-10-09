@@ -1,9 +1,9 @@
 import "server-only";
 
 import type { createClient } from "@/lib/supabase/server";
-import { addDaysIso, isIsoDate, monthStartIso, todayIso } from "./dates";
-import { BLOCKS, SEVERITIES, blockCols, blockRows } from "./incident-options";
-import { REPORT_SERIES, type MonthlyCount } from "./report-series";
+import { addDaysIso, isIsoDate, monthStartIso, plantationDayStart, todayIso } from "./dates";
+import { BLOCKS, SEVERITIES, STATUSES, blockCols, blockRows } from "./incident-options";
+import { OTHER_SERIES, REPORT_SERIES, type MonthlyCount } from "./report-series";
 
 /**
  * Incident counts for the Dashboard and Reports, read from the incidents table
@@ -33,12 +33,18 @@ async function fetchAllRows<T>(
 export const STATS_WINDOW_DAYS = 30;
 /** The highest step of the placeholder severity scale. */
 export const TOP_SEVERITY = SEVERITIES[SEVERITIES.length - 1];
+/** Statuses that count as still open on the Dashboard. */
+export const OPEN_STATUSES = ["open", "monitoring"];
 
 export interface DashboardStats {
   totalEver: number;
   recent: number;
   previous: number;
   topSeverityRecent: number;
+  /** Open or monitoring now, any incident date. */
+  openNow: number;
+  /** Set to resolved within the last 30 days (by resolved_at, plantation days). */
+  resolvedRecent: number;
   blocksRecent: number;
   blocksTotal: number;
 }
@@ -50,11 +56,16 @@ export async function getDashboardStats(supabase: Supabase): Promise<DashboardSt
   const previousStart = addDaysIso(start, -STATS_WINDOW_DAYS);
   const count = () => supabase.from("incidents").select("id", { count: "exact", head: true });
 
-  const [all, recent, previous, topSeverity, blocks] = await Promise.all([
+  const [all, recent, previous, topSeverity, open, resolved, blocks] = await Promise.all([
     count(),
     count().gte("incident_date", start).lte("incident_date", today),
     count().gte("incident_date", previousStart).lt("incident_date", start),
     count().gte("incident_date", start).lte("incident_date", today).eq("severity", TOP_SEVERITY.value),
+    count().in("status", OPEN_STATUSES),
+    // resolved_at is cleared by a trigger when an incident is reopened.
+    count()
+      .gte("resolved_at", plantationDayStart(start))
+      .lt("resolved_at", plantationDayStart(addDaysIso(today, 1))),
     fetchAllRows<{ block: string }>((from, to) =>
       supabase
         .from("incidents")
@@ -66,13 +77,17 @@ export async function getDashboardStats(supabase: Supabase): Promise<DashboardSt
     ),
   ]);
 
-  if (all.error || recent.error || previous.error || topSeverity.error || !blocks) return null;
+  if (all.error || recent.error || previous.error || topSeverity.error || open.error || resolved.error || !blocks) {
+    return null;
+  }
 
   return {
     totalEver: all.count ?? 0,
     recent: recent.count ?? 0,
     previous: previous.count ?? 0,
     topSeverityRecent: topSeverity.count ?? 0,
+    openNow: open.count ?? 0,
+    resolvedRecent: resolved.count ?? 0,
     blocksRecent: new Set(blocks.map((b) => b.block)).size,
     blocksTotal: BLOCKS.length,
   };
@@ -87,12 +102,14 @@ export interface ReportFilters {
   to: string;
   /** "all" or a block row letter from the placeholder grid. */
   area: string;
-  /** "all" or a suspected_disease value. */
+  /** "all", a suspected_disease value, or OTHER_SERIES.key. */
   disease: string;
+  /** "all" or a status value (the incident's current status). */
+  status: string;
 }
 
 export function defaultReportFilters(): ReportFilters {
-  return { from: monthStartIso(5), to: todayIso(), area: "all", disease: "all" };
+  return { from: monthStartIso(5), to: todayIso(), area: "all", disease: "all", status: "all" };
 }
 
 type SearchParams = Record<string, string | string[] | undefined>;
@@ -113,6 +130,7 @@ export function parseReportFilters(
     to: get("to") || defaults.to,
     area: get("area") || "all",
     disease: get("disease") || "all",
+    status: get("status") || "all",
   };
 
   let error: string | null = null;
@@ -121,8 +139,9 @@ export function parseReportFilters(
   else if (monthKeys(filters.from, filters.to).length > MAX_REPORT_MONTHS)
     error = `Choose a range of ${MAX_REPORT_MONTHS} months or less.`;
   else if (filters.area !== "all" && !blockRows.includes(filters.area)) error = "Unknown area.";
-  else if (filters.disease !== "all" && !REPORT_SERIES.some((s) => s.key === filters.disease))
+  else if (filters.disease !== "all" && ![...REPORT_SERIES, OTHER_SERIES].some((s) => s.key === filters.disease))
     error = "Unknown disease.";
+  else if (filters.status !== "all" && !STATUSES.some((s) => s.value === filters.status)) error = "Unknown status.";
 
   return { filters, error };
 }
@@ -142,7 +161,11 @@ export async function getReport(supabase: Supabase, filters: ReportFilters): Pro
       .gte("incident_date", filters.from)
       .lte("incident_date", filters.to);
     if (filters.area !== "all") q = q.in("block", blockCols.map((c) => `${filters.area}${c}`));
-    if (filters.disease !== "all") q = q.eq("suspected_disease", filters.disease);
+    if (filters.status !== "all") q = q.eq("status", filters.status);
+    // "Other" is filtered below, after reading.
+    if (filters.disease !== "all" && filters.disease !== OTHER_SERIES.key) {
+      q = q.eq("suspected_disease", filters.disease);
+    }
     return q.order("id").range(from, to);
   });
   if (!rows) return null;
@@ -152,19 +175,22 @@ export async function getReport(supabase: Supabase, filters: ReportFilters): Pro
   const months: MonthlyCount[] = keys.map((month) => ({
     month,
     label: monthLabel(month, multiYear),
-    counts: Object.fromEntries(REPORT_SERIES.map((s) => [s.key, 0])),
+    counts: Object.fromEntries([...REPORT_SERIES, OTHER_SERIES].map((s) => [s.key, 0])),
   }));
   const byMonth = new Map(months.map((m) => [m.month, m]));
 
-  // Values no longer in the options list are left out of the per-disease
-  // counts, so every total below is the sum of what the chart shows.
+  // Values no longer in the options list are counted under "Other", so every
+  // incident in the range shows up in the chart and the totals.
+  const known = new Set(REPORT_SERIES.map((s) => s.key));
   for (const r of rows) {
+    const key = known.has(r.suspected_disease) ? r.suspected_disease : OTHER_SERIES.key;
+    if (filters.disease === OTHER_SERIES.key && key !== OTHER_SERIES.key) continue;
     const m = byMonth.get(r.incident_date.slice(0, 7));
-    if (m && r.suspected_disease in m.counts) m.counts[r.suspected_disease] += 1;
+    if (m) m.counts[key] += 1;
   }
 
   const totals = Object.fromEntries(
-    REPORT_SERIES.map((s) => [s.key, months.reduce((n, m) => n + m.counts[s.key], 0)]),
+    [...REPORT_SERIES, OTHER_SERIES].map((s) => [s.key, months.reduce((n, m) => n + m.counts[s.key], 0)]),
   );
   const total = Object.values(totals).reduce((n, v) => n + v, 0);
   return { months, totals, total };

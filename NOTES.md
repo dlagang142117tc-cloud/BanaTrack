@@ -5,6 +5,51 @@ Update this at the end of each session.
 
 ---
 
+## Session: 2026-10-09 — Dashboard and Reports after the Incident Log merge (branch `feature/dashboard-reports-real-data`)
+
+Denns took over the branch.
+
+### Merge
+
+- Merged `main` (Incident Log PR #6) into the branch with a merge commit (no
+  rebase, so no force-push). Only conflict: `NOTES.md` (both branches added an
+  entry at the top; both kept). The branch adds no migrations.
+
+### Changed
+
+- **Dashboard:** two new cards, **Open now** (status open or monitoring, any
+  incident date) and **Resolved (30 days)** (`resolved_at` within the last 30
+  plantation days; reopening clears `resolved_at`, so reopened incidents drop
+  out). Six cards in a 3-column grid on large screens (2 on small).
+  `plantationDayStart()` in `lib/dates.ts` turns a plantation date into the
+  Asia/Manila start-of-day timestamp for the `resolved_at` filter.
+- **Reports:** new **Current status** filter (`status` in the URL: any, open,
+  monitoring, resolved). It filters by each incident's status now, not its
+  status during the period; the source note says so.
+- **Reports:** suspected-disease values no longer in `SUSPECTED_DISEASES` are
+  counted under **"Other (no longer in the list)"** (`OTHER_SERIES` in
+  `report-series.ts`, grey) instead of being dropped. The series, tile and
+  legend entry only show when there are any; it can also be chosen in the
+  disease filter.
+
+### Tested
+
+- Lint, type-check and build pass.
+- Read-only check of the new count queries against Supabase: open/monitoring
+  = 3, resolved in the last 30 days = 1 (INC-0001), matching the table.
+- Denns tested the Dashboard and Reports in the browser (2026-10-09), all
+  passed: new cards, resolve/reopen updating them, status filter, URL
+  bookmarking, invalid status, empty states, "Other" series, layout.
+
+### Known issues / left to do
+
+- The Area filter still uses placeholder block rows (A–D).
+- Export is still `window.print()`. In the browser print / Export PDF, the
+  chart bars and legend colors don't print and the data table stays
+  collapsed. To be handled in the "Reports PDF export" task.
+
+---
+
 ## Session: 2026-10-09 — Incident Log fixes after testing (branch `feature/incident-log`)
 
 ### Added
@@ -124,8 +169,9 @@ Update this at the end of each session.
 
 ## Session: 2026-10-04 — Dashboard and Reports use real incidents (branch `feature/dashboard-reports-real-data`)
 
-Built on top of `feature/incident-log` (not yet merged when this started), so
-**the Incident Log PR must be merged first**. No new migration.
+Built on the first Incident Log commit. Denns took the branch over on
+2026-10-09 and merged `main` (with the finished Incident Log, PR #6) into it;
+see the 2026-10-09 entry above. No new migration.
 
 ### Added
 
@@ -148,7 +194,8 @@ Built on top of `feature/incident-log` (not yet merged when this started), so
 
 - Dashboard stat cards: **Incidents**, **Blocks affected**, **High severity**
   (all last 30 days, real) and **Awaiting review** (still sample, tagged).
-  "Open" / "Resolved" cards were dropped: incidents have no status column.
+  "Open" / "Resolved" cards were dropped at the time because incidents had no
+  status column yet (added back on 2026-10-09, after migration 005).
 - Reports: summary tiles follow the disease filter; labels say "suspected
   disease, as recorded in the field" (not "screened pattern"); the fake model
   footer is replaced by a source note. Empty states for "no report yet",
@@ -166,8 +213,8 @@ Built on top of `feature/incident-log` (not yet merged when this started), so
 
 ### Known issues / left to do
 
-- Incidents whose `suspected_disease` is no longer in the options list are
-  left out of report counts.
+- ~~Incidents whose `suspected_disease` is no longer in the options list are
+  left out of report counts.~~ Fixed 2026-10-09: counted under "Other".
 - Area filter is by placeholder block row (A–D); change it with the real
   block list.
 - Export is still `window.print()` (Reports PDF export is its own task).

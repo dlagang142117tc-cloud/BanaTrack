@@ -22,6 +22,17 @@ export const REPORT_SERIES: ReportSeries[] = [...SUSPECTED_DISEASES]
   .sort((a, b) => rank(a.value) - rank(b.value))
   .map((d) => ({ key: d.value, label: d.label, color: SERIES_COLORS[d.value] ?? FALLBACK_COLOR }));
 
+/**
+ * Incidents whose suspected_disease is no longer in the options list (renamed
+ * or removed) are counted here instead of being dropped. Shown only when
+ * there are any. The key can't collide with a stored value from the list.
+ */
+export const OTHER_SERIES: ReportSeries = {
+  key: "__other",
+  label: "Other (no longer in the list)",
+  color: FALLBACK_COLOR,
+};
+
 function rank(value: string) {
   const i = COLOR_ORDER.indexOf(value);
   return i === -1 ? COLOR_ORDER.length : i;

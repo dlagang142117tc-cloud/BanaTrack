@@ -4,7 +4,8 @@ import { FileBarChart, SearchX } from "lucide-react";
 import { Card, PageHeader } from "@/components/ui";
 import { createClient } from "@/lib/supabase/server";
 import { defaultReportFilters, getReport, parseReportFilters } from "@/lib/incident-stats";
-import { REPORT_SERIES } from "@/lib/report-series";
+import { STATUSES } from "@/lib/incident-options";
+import { OTHER_SERIES, REPORT_SERIES } from "@/lib/report-series";
 import { ReportFilters } from "./report-filters";
 import { PrintButton, StackedColumns } from "./report-chart";
 
@@ -18,8 +19,15 @@ export default async function ReportsPage({
   const supabase = await createClient();
   const report = parsed && !parsed.error ? await getReport(supabase, parsed.filters) : null;
 
-  const series = filters.disease === "all" ? REPORT_SERIES : REPORT_SERIES.filter((s) => s.key === filters.disease);
+  // "Other" only appears when some incidents have a value no longer in the list.
+  const allSeries = report?.totals[OTHER_SERIES.key] ? [...REPORT_SERIES, OTHER_SERIES] : REPORT_SERIES;
+  const series =
+    filters.disease === "all"
+      ? allSeries
+      : [...REPORT_SERIES, OTHER_SERIES].filter((s) => s.key === filters.disease);
   const diseaseLabel = filters.disease === "all" ? "All suspected diseases" : series[0]?.label;
+  const statusLabel =
+    filters.status === "all" ? "Any status" : `${STATUSES.find((s) => s.value === filters.status)?.label} now`;
 
   return (
     <div className="space-y-6">
@@ -58,7 +66,7 @@ export default async function ReportsPage({
               <h2 className="font-display text-lg font-semibold text-ink">Incident summary</h2>
               <p className="text-xs text-muted">
                 {filters.from} to {filters.to} · {filters.area === "all" ? "All blocks" : `Row ${filters.area}`} ·{" "}
-                {diseaseLabel}
+                {diseaseLabel} · {statusLabel}
               </p>
             </div>
             {report.total > 0 && <PrintButton />}
@@ -66,7 +74,7 @@ export default async function ReportsPage({
 
           {report.total === 0 ? (
             <EmptyBox icon={<SearchX className="mx-auto size-8 text-leaf-300" aria-hidden />} title="No incidents match these filters">
-              Try a wider date range or a different area or disease. New incidents are recorded in the{" "}
+              Try a wider date range or a different area, disease or status. New incidents are recorded in the{" "}
               <Link href="/incidents" className="font-medium text-leaf-700 hover:text-leaf-900">Incident Log</Link>.
             </EmptyBox>
           ) : (
@@ -85,8 +93,10 @@ export default async function ReportsPage({
           )}
 
           <p className="text-[11px] text-muted">
-            Source: incidents saved in the Incident Log, counted by incident date. &ldquo;Suspected disease&rdquo; is
-            the field team&apos;s observation — not a screening result or a confirmed diagnosis.
+            Source: incidents saved in the Incident Log, counted by incident date. Status is each incident&apos;s
+            current status, not its status during the period. &ldquo;Suspected disease&rdquo; is the field
+            team&apos;s observation — not a screening result or a confirmed diagnosis. &ldquo;Other&rdquo; counts
+            suspected-disease values that are no longer in the Incident Log list.
           </p>
         </div>
       )}

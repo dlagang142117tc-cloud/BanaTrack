@@ -4,14 +4,15 @@ import { useTransition, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import { FileBarChart, Loader2 } from "lucide-react";
 import { buttonStyles, cx, inputStyles, labelStyles } from "@/components/ui";
-import { blockCols, blockRows } from "@/lib/incident-options";
-import { REPORT_SERIES } from "@/lib/report-series";
+import { STATUSES, blockCols, blockRows } from "@/lib/incident-options";
+import { OTHER_SERIES, REPORT_SERIES } from "@/lib/report-series";
 
 interface Filters {
   from: string;
   to: string;
   area: string;
   disease: string;
+  status: string;
 }
 
 /** Puts the filters in the URL; the server page reads them and loads the report. */
@@ -23,14 +24,14 @@ export function ReportFilters({ initial }: { initial: Filters }) {
     e.preventDefault();
     const data = new FormData(e.currentTarget);
     const params = new URLSearchParams();
-    for (const k of ["from", "to", "area", "disease"]) params.set(k, String(data.get(k) ?? ""));
+    for (const k of ["from", "to", "area", "disease", "status"]) params.set(k, String(data.get(k) ?? ""));
     startTransition(() => router.push(`/reports?${params}`));
   }
 
   const lastCol = blockCols[blockCols.length - 1];
 
   return (
-    <form onSubmit={generate} className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5 lg:items-end">
+    <form onSubmit={generate} className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 lg:items-end xl:grid-cols-6">
       <div className="flex flex-col gap-1.5">
         <label htmlFor="from" className={labelStyles}>From</label>
         <input id="from" name="from" type="date" required defaultValue={initial.from} className={inputStyles} />
@@ -54,6 +55,16 @@ export function ReportFilters({ initial }: { initial: Filters }) {
           <option value="all">All</option>
           {REPORT_SERIES.map((s) => (
             <option key={s.key} value={s.key}>{s.label}</option>
+          ))}
+          <option value={OTHER_SERIES.key}>{OTHER_SERIES.label}</option>
+        </select>
+      </div>
+      <div className="flex flex-col gap-1.5">
+        <label htmlFor="status" className={labelStyles}>Current status</label>
+        <select id="status" name="status" defaultValue={initial.status} className={inputStyles}>
+          <option value="all">Any</option>
+          {STATUSES.map((s) => (
+            <option key={s.value} value={s.value}>{s.label}</option>
           ))}
         </select>
       </div>

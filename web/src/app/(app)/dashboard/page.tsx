@@ -33,6 +33,18 @@ function buildStatCards(stats: DashboardStats | null) {
       tone: (change > 0 ? "warn" : change < 0 ? "good" : "neutral") as Tone,
     },
     {
+      label: "Open now",
+      value: value(stats?.openNow),
+      note: stats ? "open or monitoring, any date" : "Unavailable",
+      tone: (stats?.openNow ? "warn" : "neutral") as Tone,
+    },
+    {
+      label: `Resolved (${STATS_WINDOW_DAYS} days)`,
+      value: value(stats?.resolvedRecent),
+      note: stats ? "marked resolved in this period" : "Unavailable",
+      tone: (stats?.resolvedRecent ? "good" : "neutral") as Tone,
+    },
+    {
       label: "Blocks affected",
       value: value(stats?.blocksRecent),
       note: stats ? `of ${stats.blocksTotal} blocks` : "Unavailable",
@@ -134,7 +146,9 @@ export default async function DashboardPage() {
       <div>
         <div className="mb-3 flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
           <h2 className="font-display text-sm font-semibold uppercase tracking-wider text-muted">Incidents</h2>
-          <p className="text-xs text-muted">Last {STATS_WINDOW_DAYS} days, by incident date</p>
+          <p className="text-xs text-muted">
+            Last {STATS_WINDOW_DAYS} days by incident date (Resolved: by resolved date; Open now: all dates)
+          </p>
         </div>
         {!stats && (
           <p role="alert" className="mb-3 rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-800">
@@ -147,7 +161,7 @@ export default async function DashboardPage() {
             <Link href="/incidents" className="font-medium text-leaf-700 hover:text-leaf-900">Incident Log</Link>.
           </p>
         )}
-        <div className="grid grid-cols-2 gap-3 lg:grid-cols-4 lg:gap-4">
+        <div className="grid grid-cols-2 gap-3 lg:grid-cols-3 lg:gap-4">
           {statCards.map((s) => (
             <div key={s.label} className="rounded-2xl border border-line bg-white p-4 sm:p-5">
               <div className="flex flex-wrap items-start justify-between gap-2">

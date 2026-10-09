@@ -29,3 +29,16 @@ export function addDaysIso(iso: string, days: number): string {
   d.setUTCDate(d.getUTCDate() + days);
   return d.toISOString().slice(0, 10);
 }
+
+const offsetFmt = new Intl.DateTimeFormat("en-US", {
+  timeZone: PLANTATION_LOCATION.timezone,
+  timeZoneName: "longOffset",
+});
+
+/** The instant a plantation day starts, as an ISO timestamp with offset (for timestamptz filters). */
+export function plantationDayStart(iso: string): string {
+  const name = offsetFmt.formatToParts(new Date(`${iso}T12:00:00Z`)).find((p) => p.type === "timeZoneName")?.value;
+  // "GMT+08:00" → "+08:00"; plain "GMT" means UTC.
+  const offset = name && name !== "GMT" ? name.slice(3) : "Z";
+  return `${iso}T00:00:00${offset}`;
+}
