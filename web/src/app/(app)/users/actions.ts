@@ -6,6 +6,7 @@ import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { passwordError } from "@/lib/passwords";
 import { ROLE_LABELS, isRole, type Role } from "@/lib/roles";
+import { activityStatus } from "./activity";
 
 export type ActionState = { ok: boolean; message: string } | undefined;
 
@@ -13,16 +14,6 @@ type AdminAction = "role_change" | "password_reset" | "deactivate" | "reactivate
 
 // Deactivation is a ban of this length; reactivating lifts it with "none".
 const BAN_DURATION = "876000h"; // ~100 years
-
-/**
- * Tables that record a user's field work. Accounts with rows in any of these
- * must be deactivated instead of deleted, to keep the audit trail intact.
- * Add each table here once it exists, e.g.
- *   { table: "incidents", column: "reported_by" },
- *   { table: "screenings", column: "submitted_by" },
- *   { table: "review_actions", column: "reviewer_id" },
- */
-const ACTIVITY_TABLES: { table: string; column: string }[] = [];
 
 function fail(message: string): ActionState {
   return { ok: false, message };
@@ -78,15 +69,6 @@ async function isLastActiveAdmin(client: SupabaseClient, target: Pick<Target, "r
     .eq("role", "admin")
     .is("deactivated_at", null);
   return (count ?? 0) <= 1;
-}
-
-async function hasActivityRecords(admin: SupabaseClient, userId: string) {
-  for (const { table, column } of ACTIVITY_TABLES) {
-    const { count, error } = await admin.from(table).select(column, { count: "exact", head: true }).eq(column, userId);
-    // fail safe: if we can't tell, don't allow a permanent delete
-    if (error || (count ?? 0) > 0) return true;
-  }
-  return false;
 }
 
 /** Audit rows never include passwords. A failed insert doesn't undo the action. */
@@ -287,7 +269,8 @@ export async function deleteUserAccount(_prevState: ActionState, formData: FormD
     if (await isLastActiveAdmin(admin, target)) {
       return fail("The last active admin can't be deleted.");
     }
-    if (await hasActivityRecords(admin, userId)) {
+    // fail safe: if we can't tell, don't allow a permanent delete
+    if ((await activityStatus(admin, userId)) !== "no") {
       return fail("This user has recorded field activity. Deactivate the account instead of deleting it.");
     }
 

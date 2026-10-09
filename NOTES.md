@@ -5,6 +5,185 @@ Update this at the end of each session.
 
 ---
 
+## Session: 2026-10-09 — Incident Log fixes after testing (branch `feature/incident-log`)
+
+### Added
+
+- **`supabase/migrations/005_incident_status_and_weather.sql`** (Denns runs
+  it; 004 is unchanged):
+  - `incidents.status` (`open` / `monitoring` / `resolved`, check constraint,
+    default `open`; existing rows become `open`) and `resolved_at` (set or
+    cleared by a trigger when status changes).
+  - `last_edited_by` (restrict), `last_edited_by_name`, `last_edited_at`,
+    set by the `track_incident_changes` trigger from the session on every
+    user edit. Service-role writes (weather) don't count as edits.
+  - `weather_window_start` / `weather_window_end`: the days the snapshot
+    covers.
+  - Column grants: users may insert only the observation columns
+    (date, block, disease, severity, action, notes, reported_by) and update
+    only status, block, suspected disease, severity, action and notes.
+    `incident_date` is locked so it always matches the weather window.
+  - `guard_incident_weather` trigger: any `authenticated`/`anon` insert or
+    update that sets or changes a weather column or the date is rejected
+    (a second layer behind the grants).
+  - `update_incident()` RPC: saves the incident row and replaces its symptoms
+    in one transaction. Runs as the caller, so RLS and grants still apply.
+- **Edit incident** (pencil button in the history table, for the reporter,
+  supervisors and admins): status, block, suspected disease, severity,
+  action, symptoms, notes. Server action `updateIncident` validates against
+  `incident-options.ts` (new `STATUSES` list) and calls the RPC.
+- **History table**: Status column (badge, resolved time); "Edited by X, time"
+  under the ID; weather cell shows the date window and source, and hovering
+  each label shows exactly what it covers.
+- **`web/scripts/recalculate-weather.mts`**: recalculates existing snapshots
+  with the service role and prints old → new values
+  (`node --env-file=.env.local scripts/recalculate-weather.mts
+  [--only-forecast] [--dry-run]`, run from `web/`). `tsconfig.json` now has
+  `allowImportingTsExtensions` so the script can import `lib/weather.ts`.
+- `users/activity.ts` (server-only): `ACTIVITY_TABLES` moved here, plus
+  `incidents.last_edited_by`. `/users` disables Delete upfront for users with
+  field records ("Has field records, deactivate instead"); the server action
+  still refuses on its own.
+
+### Changed
+
+- **Weather snapshot rule** (`getWeatherSnapshot`), D = incident date,
+  Asia/Manila days, inclusive: rain 3d = total D−2…D; rain 7d = total
+  D−6…D; humidity and temperature = mean of the daily means D−6…D. Source:
+  Open-Meteo historical archive; if the archive doesn't have every day yet
+  (it ends yesterday or earlier), the forecast endpoint's `past_days`. Stored
+  as `open-meteo-archive` or `open-meteo-forecast-past-days`. (Before, any
+  date in the last 60 days came from the forecast API.)
+- **Weather is server-only**: `createIncident` inserts the incident with the
+  user's session (no weather), then `attachWeather` writes the snapshot with
+  the service role client.
+
+### Tested
+
+- Lint, type-check and build pass. `getWeatherSnapshot` checked against live
+  Open-Meteo for today, yesterday, last week and March (archive sums match
+  the raw API).
+- 005 run in Supabase (2026-10-09). Recalculation script run: INC-0001
+  (2026-10-07) now uses `open-meteo-archive`, window 2026-10-01…2026-10-07
+  (rain 3d 28.9 → 30.0 mm, rain 7d 69.2 → 70.3 mm, humidity 88.6 → 88.3%,
+  temp 26.7 → 26.8 °C); its symptoms and photos are unchanged, and the
+  recalculation wasn't recorded as a user edit.
+- **Manual tests, 2026-10-09 (partly done):** passed: status, editing,
+  resolve/reopen, search. **Left:** other roles (field user can't edit
+  others' incidents; supervisor/admin can), new incidents dated today and a
+  week ago (weather source/window), Users page Delete button. Also not yet
+  run: weather/date changes via the API rejected, and saving without
+  `SUPABASE_SERVICE_ROLE_KEY`.
+- **Later on 2026-10-09:** Denns passed all the manual tests left above
+  (except saving without the service role key). API permission check run
+  with a temporary Field Personnel user
+  signed in with the anon key, on an incident they reported: updating
+  `weather_rain_7d_mm`, updating `incident_date`, and inserting with a weather
+  value were all rejected (HTTP 403, `42501 permission denied for table
+  incidents`, from the column grants; the trigger layer is never reached).
+  The row was unchanged. The temp user and its incident (id 5) were deleted,
+  so incident ids skip 5 (the next one is INC-0006).
+- **"No visible symptoms" and weather header** (Denns tested both,
+  2026-10-09, all passed):
+  - `incident-options.ts`: `NO_VISIBLE_SYMPTOMS` ("No visible symptoms") and
+    `symptomsProblem()`, the shared rule: at least one symptom or "No visible
+    symptoms", never both. Stored as an ordinary `incident_symptoms` row, so
+    no migration.
+  - `SymptomPicker` now takes `onChange` and handles the exclusivity itself
+    (ticking "No visible symptoms" clears the symptoms; ticking a symptom
+    clears it), and shows an `error` under the chips. Used by the new-incident
+    form and the edit dialog; both block saving with the error if nothing is
+    ticked. `createIncident` / `updateIncident` check the same rule on the
+    server.
+  - Existing incidents are unchanged; editing one that has no symptoms now
+    requires choosing a symptom or "No visible symptoms".
+  - History header renamed to "Weather (7 days before)" with the tooltip "Rain,
+    humidity and temperature for the 7 days up to and including the incident
+    date."
+  - Lint, type-check and build pass.
+  - **Left for later:** the symptom rule isn't enforced in the database; a
+    direct call to `update_incident()` (or inserts into `incident_symptoms`)
+    can still leave an incident with no symptoms. Would need a migration
+    (e.g. a deferred constraint trigger).
+  - **Left for later:** the incident history table is wide and needs
+    sideways scrolling on phones.
+
+### Known issues / left to do
+
+- **Weather snapshots need `SUPABASE_SERVICE_ROLE_KEY`** in `web/.env.local`
+  (and in production). Without it, incidents still save but with no weather
+  snapshot; the success message says so.
+- **Same-day incidents** use forecast hours for the rest of that day
+  (`open-meteo-forecast-past-days`). Re-run
+  `scripts/recalculate-weather.mts --only-forecast` a few days later to
+  replace them with archive data.
+- Edits don't keep a history, only the last editor and time.
+- The script prints a harmless Node warning (`MODULE_TYPELESS_PACKAGE_JSON`).
+
+---
+
+## Session: 2026-10-04 — Incident Log saves real data (branch `feature/incident-log`)
+
+### Added
+
+- **`supabase/migrations/004_incident_log.sql`** (Denns runs it):
+  - `incidents` — date, block, suspected disease, severity, action, notes,
+    `reported_by` + `reporter_name` (set by a trigger from the session, never
+    from the client), and the weather snapshot columns (3-day / 7-day rain,
+    mean humidity, mean temperature, source, fetched-at).
+  - `incident_symptoms` (one row per symptom) and `incident_photos` (one row
+    per file, `uploaded_by`).
+  - Private storage bucket `incident-photos` (10 MB, JPEG/PNG/WebP/HEIC);
+    files live under `<user id>/<uuid>.<ext>`.
+  - Helpers `is_active_user()` and `can_manage_incidents()` (active
+    supervisor/admin). RLS: active users read and create (as themselves);
+    update/delete only for the reporter, supervisors and admins; deactivated
+    users get nothing. Same rules on the bucket. Updates are limited by column
+    grants to the observation fields (not reporter, dates, or weather).
+  - Values (block, symptom, severity…) are plain text — no DB constraints.
+- **`web/src/lib/incident-options.ts`** — the single place for the block list
+  (placeholder A1–D6; `mock-data.ts` re-exports it for the Map/Screening/
+  Reports previews), symptoms, severity scale, suspected diseases, actions and
+  photo limits. The server action validates against these lists.
+- **`getWeatherSnapshot()`** in `lib/weather.ts` — Open-Meteo daily data for
+  the 7 days up to the incident date (forecast API for the last 60 days,
+  archive API before that). Returns null on failure; the incident still saves.
+- **`/incidents`** rebuilt: server page loads real incidents (newest first,
+  latest 500) with signed thumbnail URLs (1 hour); `incident-form.tsx`
+  (personnel = signed-in user, read-only; up to 6 photos uploaded from the
+  browser straight to the bucket, then `createIncident` links them; uploads
+  are removed again if saving fails); `incident-history.tsx` (search, photo
+  thumbnails, weather column, delete with confirmation for permitted users).
+- `users/actions.ts` `ACTIVITY_TABLES` now lists `incidents.reported_by` and
+  `incident_photos.uploaded_by`, so accounts with incidents must be
+  deactivated instead of deleted.
+
+### Changed
+
+- Sample data / "Not saved" tags removed from the Incident Log only. Dashboard,
+  Map and Reports still use mock incidents (separate roadmap tasks).
+
+### Tested
+
+- Lint, type-check and build pass. Both Open-Meteo endpoints checked by hand.
+- **Not yet tested against Supabase** — needs `004_incident_log.sql` run first.
+
+### Known issues / left to do
+
+- ~~No edit screen yet (the database already allows edits for the reporter,
+  supervisors and admins).~~ **Resolved 2026-10-09:** edit dialog + status.
+- ~~The weather snapshot is fetched by the server but inserted with the user's
+  session, so a user calling the API directly could insert their own weather
+  numbers. Acceptable for now; move the insert to the service role if it
+  matters.~~ **Resolved 2026-10-09:** written by the service role only (005).
+- If a photo file can't be removed after a failed save or delete, it stays in
+  the bucket as an orphan.
+- Thumbnails are the full-size images (no resizing); signed URLs expire after
+  1 hour, so a long-open page needs a refresh.
+- History search is client-side over the latest 500 incidents.
+
+---
+
 ## Session: 2026-10-03 — Team rules and web roadmap (branch `chore/team-rules`)
 
 ### Added

@@ -8,6 +8,8 @@
  * already real — see lib/weather.ts.
  */
 
+import { blockCols, blockRows } from "./incident-options";
+
 export type Severity = "none" | "low" | "moderate" | "high";
 export type Priority = "High" | "Medium" | "Low";
 export type Disease = "Moko" | "Panama";
@@ -33,8 +35,8 @@ const blockSeverities: Record<string, Severity> = {
 
 const supervisors = ["R. Villanueva", "M. Santos", "J. Dela Cruz", "A. Reyes"];
 
-export const blockRows = ["A", "B", "C", "D"];
-export const blockCols = [1, 2, 3, 4, 5, 6];
+// The placeholder block grid lives with the Incident Log options; re-exported for the mock pages.
+export { blockRows, blockCols };
 
 export const plantationBlocks: PlantationBlock[] = Object.entries(blockSeverities).map(
   ([id, severity], i) => ({
@@ -61,25 +63,6 @@ export interface Incident {
   action: string;
   notes: string;
 }
-
-export const symptomOptions = [
-  "Leaf yellowing",
-  "Leaf wilting / collapse",
-  "Pseudostem splitting",
-  "Vascular discoloration",
-  "Bacterial ooze",
-  "Fruit rot / discoloration",
-  "Stunted growth",
-];
-
-export const actionOptions = [
-  "Tagged for monitoring",
-  "Plant eradicated",
-  "Area quarantined",
-  "Tools disinfected",
-  "Sample sent to lab",
-  "No action yet",
-];
 
 export const incidents: Incident[] = [
   {
@@ -125,8 +108,6 @@ export const incidents: Incident[] = [
     action: "Plant eradicated", notes: "",
   },
 ];
-
-export const personnelOptions = ["J. Dela Cruz", "M. Santos", "A. Reyes", "R. Villanueva"];
 
 export const incidentStats = [
   { label: "Open incidents", value: 23, delta: "+4 this week", tone: "warn" as const },

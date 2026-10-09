@@ -1,7 +1,9 @@
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { Card, PageHeader, cx } from "@/components/ui";
 import { ROLE_LABELS, isRole, type Role } from "@/lib/roles";
+import { activityStatus } from "./activity";
 import { RoleForm } from "./role-form";
 import { UserActions } from "./user-actions";
 
@@ -82,6 +84,20 @@ export default async function UsersPage() {
   const log = (logData ?? []) as AdminActionRow[];
   const nameById = new Map(users.map((u) => [u.id, u.full_name || u.email]));
 
+  // Users with field records can't be deleted (deleteUserAccount refuses), so
+  // the Delete button is disabled for them upfront. If the check can't run,
+  // the button stays enabled and the server action still refuses.
+  const withRecords = new Set<string>();
+  try {
+    const admin = createAdminClient();
+    const statuses = await Promise.all(
+      users.filter((u) => u.id !== user.id).map(async (u) => [u.id, await activityStatus(admin, u.id)] as const),
+    );
+    for (const [id, status] of statuses) if (status === "yes") withRecords.add(id);
+  } catch {
+    // Missing SUPABASE_SERVICE_ROLE_KEY: the account actions show that error when used.
+  }
+
   return (
     <div className="space-y-6">
       <PageHeader
@@ -140,7 +156,12 @@ export default async function UsersPage() {
                         {isSelf ? (
                           <span className="text-xs text-muted">Not available for your own account</span>
                         ) : (
-                          <UserActions userId={u.id} email={u.email} deactivated={deactivated} />
+                          <UserActions
+                            userId={u.id}
+                            email={u.email}
+                            deactivated={deactivated}
+                            hasRecords={withRecords.has(u.id)}
+                          />
                         )}
                       </td>
                     </tr>
