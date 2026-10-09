@@ -10,10 +10,61 @@ import {
   SampleTag,
   cx,
 } from "@/components/ui";
-import { incidentStats, modelGovernance, reviewCases } from "@/lib/mock-data";
+import { STATS_WINDOW_DAYS, TOP_SEVERITY, getDashboardStats, type DashboardStats } from "@/lib/incident-stats";
+import { awaitingReviewSample, modelGovernance, reviewCases } from "@/lib/mock-data";
 import { PLANTATION_LOCATION, assessDiseaseRisk, getForecast } from "@/lib/weather";
 
 const PRIORITY_ORDER = { High: 0, Medium: 1, Low: 2 };
+
+type Tone = "warn" | "good" | "neutral";
+
+function buildStatCards(stats: DashboardStats | null) {
+  const value = (n: number | undefined) => (n === undefined ? "—" : n);
+  const change = stats ? stats.recent - stats.previous : 0;
+  return [
+    {
+      label: "Incidents",
+      value: value(stats?.recent),
+      note: !stats
+        ? "Unavailable"
+        : change === 0
+          ? `Same as previous ${STATS_WINDOW_DAYS} days`
+          : `${change > 0 ? "+" : "−"}${Math.abs(change)} vs. previous ${STATS_WINDOW_DAYS} days`,
+      tone: (change > 0 ? "warn" : change < 0 ? "good" : "neutral") as Tone,
+    },
+    {
+      label: "Open now",
+      value: value(stats?.openNow),
+      note: stats ? "open or monitoring, any date" : "Unavailable",
+      tone: (stats?.openNow ? "warn" : "neutral") as Tone,
+    },
+    {
+      label: `Resolved (${STATS_WINDOW_DAYS} days)`,
+      value: value(stats?.resolvedRecent),
+      note: stats ? "marked resolved in this period" : "Unavailable",
+      tone: (stats?.resolvedRecent ? "good" : "neutral") as Tone,
+    },
+    {
+      label: "Blocks affected",
+      value: value(stats?.blocksRecent),
+      note: stats ? `of ${stats.blocksTotal} blocks` : "Unavailable",
+      tone: "neutral" as Tone,
+    },
+    {
+      label: `${TOP_SEVERITY.label} severity`,
+      value: value(stats?.topSeverityRecent),
+      note: "as recorded in the field",
+      tone: (stats?.topSeverityRecent ? "warn" : "neutral") as Tone,
+    },
+    {
+      label: "Awaiting review",
+      value: awaitingReviewSample.value,
+      note: awaitingReviewSample.note,
+      tone: "warn" as Tone,
+      sample: true,
+    },
+  ];
+}
 
 const RISK_TONE = {
   Low: { box: "border-leaf-200 bg-leaf-50", icon: "bg-leaf-500 text-white", chip: "ring-leaf-200" },
@@ -26,10 +77,12 @@ export default async function DashboardPage() {
   const {
     data: { user },
   } = await supabase.auth.getUser();
-  const [{ data: profile }, forecast] = await Promise.all([
+  const [{ data: profile }, forecast, stats] = await Promise.all([
     supabase.from("profiles").select("full_name, role").eq("id", user!.id).single(),
     getForecast(),
+    getDashboardStats(supabase),
   ]);
+  const statCards = buildStatCards(stats);
 
   const firstName = profile?.full_name?.split(" ")[0];
   const today = forecast?.days[0];
@@ -91,14 +144,30 @@ export default async function DashboardPage() {
 
       {/* Stats */}
       <div>
-        <div className="mb-3 flex items-center justify-between">
+        <div className="mb-3 flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
           <h2 className="font-display text-sm font-semibold uppercase tracking-wider text-muted">Incidents</h2>
-          <SampleTag />
+          <p className="text-xs text-muted">
+            Last {STATS_WINDOW_DAYS} days by incident date (Resolved: by resolved date; Open now: all dates)
+          </p>
         </div>
-        <div className="grid grid-cols-2 gap-3 lg:grid-cols-4 lg:gap-4">
-          {incidentStats.map((s) => (
+        {!stats && (
+          <p role="alert" className="mb-3 rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-800">
+            Incident numbers couldn&apos;t be loaded. Try refreshing the page.
+          </p>
+        )}
+        {stats?.totalEver === 0 && (
+          <p className="mb-3 rounded-xl border border-dashed border-line bg-white p-3 text-sm text-muted">
+            No incidents recorded yet. These numbers fill in as incidents are saved in the{" "}
+            <Link href="/incidents" className="font-medium text-leaf-700 hover:text-leaf-900">Incident Log</Link>.
+          </p>
+        )}
+        <div className="grid grid-cols-2 gap-3 lg:grid-cols-3 lg:gap-4">
+          {statCards.map((s) => (
             <div key={s.label} className="rounded-2xl border border-line bg-white p-4 sm:p-5">
-              <p className="text-xs font-medium text-muted sm:text-sm">{s.label}</p>
+              <div className="flex flex-wrap items-start justify-between gap-2">
+                <p className="text-xs font-medium text-muted sm:text-sm">{s.label}</p>
+                {s.sample && <SampleTag />}
+              </div>
               <p className="mt-2 font-display text-3xl font-semibold tabular-nums text-ink">{s.value}</p>
               <p
                 className={cx(
@@ -108,7 +177,7 @@ export default async function DashboardPage() {
                   s.tone === "neutral" && "text-muted",
                 )}
               >
-                {s.delta}
+                {s.note}
               </p>
             </div>
           ))}
