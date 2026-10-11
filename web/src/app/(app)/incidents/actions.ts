@@ -5,6 +5,7 @@ import type { User } from "@supabase/supabase-js";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { todayIso } from "@/lib/dates";
+import { can, canDeleteIncident, canEditIncident } from "@/lib/permissions";
 import { getWeatherSnapshot } from "@/lib/weather";
 import {
   ACTIONS,
@@ -115,7 +116,8 @@ function validate(input: NewIncidentInput, userId: string, today: string): strin
 export async function createIncident(input: NewIncidentInput): Promise<IncidentActionResult> {
   const auth = await requireActiveUser();
   if ("error" in auth) return fail(auth.error);
-  const { supabase, user } = auth;
+  const { supabase, user, role } = auth;
+  if (!can(role, "incidents.create")) return fail("Your role can't record incidents.");
 
   const today = todayIso();
   const problem = validate(input, user.id, today);
@@ -211,8 +213,8 @@ export async function updateIncident(input: IncidentEditInput): Promise<Incident
 
   const { data: incident } = await supabase.from("incidents").select("reported_by").eq("id", input.id).single();
   if (!incident) return fail("That incident no longer exists.");
-  if (incident.reported_by !== user.id && role !== "supervisor" && role !== "admin") {
-    return fail("Only the reporter, supervisors and admins can edit an incident.");
+  if (!canEditIncident(role, user.id, incident.reported_by)) {
+    return fail("You don't have permission to edit this incident.");
   }
 
   // One transaction: the incident row and its symptoms are saved together or
@@ -245,8 +247,8 @@ export async function deleteIncident(id: number): Promise<IncidentActionResult> 
     .eq("id", id)
     .single();
   if (!incident) return fail("That incident no longer exists.");
-  if (incident.reported_by !== user.id && role !== "supervisor" && role !== "admin") {
-    return fail("Only the reporter, supervisors and admins can delete an incident.");
+  if (!canDeleteIncident(role, user.id, incident.reported_by)) {
+    return fail("You don't have permission to delete this incident.");
   }
 
   const { data: deleted, error } = await supabase.from("incidents").delete().eq("id", id).select("id");

@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { AlertTriangle, ArrowRight, Droplets, MapPin } from "lucide-react";
-import { createClient } from "@/lib/supabase/server";
+import { requireUser } from "@/lib/auth";
+import { PAGES, can, isPageKey } from "@/lib/permissions";
 import { WeatherIcon } from "@/components/weather-icon";
 import {
   Card,
@@ -18,7 +19,7 @@ const PRIORITY_ORDER = { High: 0, Medium: 1, Low: 2 };
 
 type Tone = "warn" | "good" | "neutral";
 
-function buildStatCards(stats: DashboardStats | null) {
+function buildStatCards(stats: DashboardStats | null, showReview: boolean) {
   const value = (n: number | undefined) => (n === undefined ? "—" : n);
   const change = stats ? stats.recent - stats.previous : 0;
   return [
@@ -56,13 +57,17 @@ function buildStatCards(stats: DashboardStats | null) {
       note: "as recorded in the field",
       tone: (stats?.topSeverityRecent ? "warn" : "neutral") as Tone,
     },
-    {
-      label: "Awaiting review",
-      value: awaitingReviewSample.value,
-      note: awaitingReviewSample.note,
-      tone: "warn" as Tone,
-      sample: true,
-    },
+    ...(showReview
+      ? [
+          {
+            label: "Awaiting review",
+            value: awaitingReviewSample.value,
+            note: awaitingReviewSample.note,
+            tone: "warn" as Tone,
+            sample: true,
+          },
+        ]
+      : []),
   ];
 }
 
@@ -72,17 +77,17 @@ const RISK_TONE = {
   Elevated: { box: "border-banana-500 bg-banana-100", icon: "bg-banana-500 text-ink", chip: "ring-banana-300" },
 };
 
-export default async function DashboardPage() {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  const [{ data: profile }, forecast, stats] = await Promise.all([
-    supabase.from("profiles").select("full_name, role").eq("id", user!.id).single(),
-    getForecast(),
-    getDashboardStats(supabase),
-  ]);
-  const statCards = buildStatCards(stats);
+export default async function DashboardPage({
+  searchParams,
+}: {
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
+}) {
+  const { supabase, profile } = await requireUser();
+  const [{ denied }, forecast, stats] = await Promise.all([searchParams, getForecast(), getDashboardStats(supabase)]);
+  // Set by requirePage() when the role may not open a page.
+  const deniedPage = isPageKey(denied) ? PAGES[denied] : null;
+  const showReview = can(profile?.role, "review.view");
+  const statCards = buildStatCards(stats, showReview);
 
   const firstName = profile?.full_name?.split(" ")[0];
   const today = forecast?.days[0];
@@ -96,8 +101,18 @@ export default async function DashboardPage() {
     <div className="space-y-6">
       <PageHeader
         title={firstName ? `Good day, ${firstName}` : "Dashboard"}
-        description="Plantation overview: field conditions, open incidents, and cases waiting on a reviewer."
+        description={
+          showReview
+            ? "Plantation overview: field conditions, open incidents, and cases waiting on a reviewer."
+            : "Plantation overview: field conditions and open incidents."
+        }
       />
+
+      {deniedPage && (
+        <p role="alert" className="rounded-xl border border-banana-300 bg-banana-50 p-3 text-sm text-ink">
+          Your role doesn&apos;t have access to {deniedPage.label}. Ask an admin if you think this is wrong.
+        </p>
+      )}
 
       {/* Disease-favorable conditions banner */}
       <div
@@ -161,9 +176,23 @@ export default async function DashboardPage() {
             <Link href="/incidents" className="font-medium text-leaf-700 hover:text-leaf-900">Incident Log</Link>.
           </p>
         )}
-        <div className="grid grid-cols-2 gap-3 lg:grid-cols-3 lg:gap-4">
-          {statCards.map((s) => (
-            <div key={s.label} className="rounded-2xl border border-line bg-white p-4 sm:p-5">
+        {/* Six cards: 2 or 3 per row. Five cards: the last one is full width on
+            phones, and the desktop rows are 3 + 2 so neither row has a gap. */}
+        <div
+          className={cx(
+            "grid grid-cols-2 gap-3 lg:gap-4",
+            statCards.length === 5 ? "lg:grid-cols-6" : "lg:grid-cols-3",
+          )}
+        >
+          {statCards.map((s, i) => (
+            <div
+              key={s.label}
+              className={cx(
+                "rounded-2xl border border-line bg-white p-4 sm:p-5",
+                statCards.length === 5 && (i < 3 ? "lg:col-span-2" : "lg:col-span-3"),
+                statCards.length === 5 && i === 4 && "col-span-2",
+              )}
+            >
               <div className="flex flex-wrap items-start justify-between gap-2">
                 <p className="text-xs font-medium text-muted sm:text-sm">{s.label}</p>
                 {s.sample && <SampleTag />}
@@ -187,7 +216,7 @@ export default async function DashboardPage() {
       <div className="grid gap-6 xl:grid-cols-5 xl:items-start">
         {/* Weather */}
         <Card
-          className="xl:col-span-3"
+          className={showReview ? "xl:col-span-3" : "xl:col-span-5"}
           title="7-day weather"
           description={
             <span className="inline-flex items-center gap-1">
@@ -242,37 +271,39 @@ export default async function DashboardPage() {
         </Card>
 
         {/* Top review priority */}
-        <Card
-          className="xl:col-span-2"
-          title="Top review priority"
-          description="AI-flagged cases waiting on a reviewer"
-          action={<SampleTag />}
-        >
-          <ul className="divide-y divide-line">
-            {topCases.map((c) => (
-              <li key={c.id} className="flex items-center gap-3 py-3 first:pt-0 last:pb-0">
-                <div className="min-w-0 flex-1">
-                  <div className="flex flex-wrap items-center gap-2">
-                    <span className="font-mono text-xs text-muted">{c.id}</span>
-                    <PriorityBadge priority={c.priority} />
-                  </div>
-                  <p className="mt-1 truncate text-sm font-medium text-ink">{c.label}</p>
-                  <p className="text-xs text-muted">Block {c.block} · {c.submittedAt}</p>
-                </div>
-                <ConfidenceMeter value={c.confidence} />
-              </li>
-            ))}
-          </ul>
-          <Link
-            href="/review"
-            className="mt-4 inline-flex items-center gap-1 text-sm font-semibold text-leaf-700 hover:text-leaf-900"
+        {showReview && (
+          <Card
+            className="xl:col-span-2"
+            title="Top review priority"
+            description="AI-flagged cases waiting on a reviewer"
+            action={<SampleTag />}
           >
-            Open review queue <ArrowRight className="size-4" aria-hidden />
-          </Link>
-        </Card>
+            <ul className="divide-y divide-line">
+              {topCases.map((c) => (
+                <li key={c.id} className="flex items-center gap-3 py-3 first:pt-0 last:pb-0">
+                  <div className="min-w-0 flex-1">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className="font-mono text-xs text-muted">{c.id}</span>
+                      <PriorityBadge priority={c.priority} />
+                    </div>
+                    <p className="mt-1 truncate text-sm font-medium text-ink">{c.label}</p>
+                    <p className="text-xs text-muted">Block {c.block} · {c.submittedAt}</p>
+                  </div>
+                  <ConfidenceMeter value={c.confidence} />
+                </li>
+              ))}
+            </ul>
+            <Link
+              href="/review"
+              className="mt-4 inline-flex items-center gap-1 text-sm font-semibold text-leaf-700 hover:text-leaf-900"
+            >
+              Open review queue <ArrowRight className="size-4" aria-hidden />
+            </Link>
+          </Card>
+        )}
       </div>
 
-      {profile?.role === "admin" && (
+      {can(profile?.role, "dashboard.governance") && (
         <Card
           title="Model governance"
           description="Visible to admins only"

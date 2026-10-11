@@ -6,6 +6,7 @@ import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { passwordError } from "@/lib/passwords";
 import { ROLE_LABELS, isRole, type Role } from "@/lib/roles";
+import { can } from "@/lib/permissions";
 import { activityStatus } from "./activity";
 
 export type ActionState = { ok: boolean; message: string } | undefined;
@@ -39,7 +40,7 @@ async function requireAdmin(): Promise<
     .select("role, deactivated_at, must_change_password")
     .eq("id", user.id)
     .single();
-  if (me?.role !== "admin" || me.deactivated_at || me.must_change_password) {
+  if (!me || !can(me.role, "users.manage") || me.deactivated_at || me.must_change_password) {
     return { error: "Only active admins can manage users." };
   }
   return { supabase, user };

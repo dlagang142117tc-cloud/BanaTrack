@@ -1,6 +1,6 @@
-import { redirect } from "next/navigation";
 import { PageHeader } from "@/components/ui";
-import { createClient } from "@/lib/supabase/server";
+import { requirePage } from "@/lib/auth";
+import { canDeleteIncident, canEditIncident } from "@/lib/permissions";
 import { PHOTO_BUCKET } from "@/lib/incident-options";
 import { IncidentForm } from "./incident-form";
 import { IncidentHistory, type IncidentRow } from "./incident-history";
@@ -9,29 +9,22 @@ const HISTORY_LIMIT = 500;
 const PHOTO_URL_SECONDS = 60 * 60;
 
 export default async function IncidentsPage() {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) redirect("/login");
+  const { supabase, user, profile } = await requirePage("incidents");
 
-  const [{ data: profile }, { data, error }] = await Promise.all([
-    supabase.from("profiles").select("full_name, role").eq("id", user.id).single(),
-    supabase
-      .from("incidents")
-      .select(
-        `id, incident_date, block, suspected_disease, severity, action_taken, notes, reported_by, reporter_name,
-         status, resolved_at, last_edited_by_name, last_edited_at,
-         weather_rain_3d_mm, weather_rain_7d_mm, weather_humidity_mean_pct, weather_temp_mean_c,
-         weather_window_start, weather_window_end, weather_source,
-         incident_symptoms(symptom), incident_photos(id, storage_path, created_at)`,
-      )
-      .order("incident_date", { ascending: false })
-      .order("created_at", { ascending: false })
-      .limit(HISTORY_LIMIT),
-  ]);
+  const { data, error } = await supabase
+    .from("incidents")
+    .select(
+      `id, incident_date, block, suspected_disease, severity, action_taken, notes, reported_by, reporter_name,
+       status, resolved_at, last_edited_by_name, last_edited_at,
+       weather_rain_3d_mm, weather_rain_7d_mm, weather_humidity_mean_pct, weather_temp_mean_c,
+       weather_window_start, weather_window_end, weather_source,
+       incident_symptoms(symptom), incident_photos(id, storage_path, created_at)`,
+    )
+    .order("incident_date", { ascending: false })
+    .order("created_at", { ascending: false })
+    .limit(HISTORY_LIMIT);
 
-  const canManageAll = profile?.role === "supervisor" || profile?.role === "admin";
+  const role = profile?.role;
   const incidents = data ?? [];
 
   // The bucket is private: thumbnails use short-lived signed URLs.
@@ -67,8 +60,9 @@ export default async function IncidentsPage() {
       windowEnd: i.weather_window_end,
       source: i.weather_source,
     },
-    // Same rule as the database's update/delete policies.
-    canEdit: canManageAll || i.reported_by === user.id,
+    // Same rules as the database's update/delete policies.
+    canEdit: canEditIncident(role, user.id, i.reported_by),
+    canDelete: canDeleteIncident(role, user.id, i.reported_by),
   }));
 
   const reporterName = profile?.full_name?.trim() || user.email || "You";

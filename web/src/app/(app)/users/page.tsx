@@ -1,5 +1,4 @@
-import { redirect } from "next/navigation";
-import { createClient } from "@/lib/supabase/server";
+import { requirePage } from "@/lib/auth";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { Card, PageHeader, cx } from "@/components/ui";
 import { ROLE_LABELS, isRole, type Role } from "@/lib/roles";
@@ -55,24 +54,7 @@ function roleLabel(role: string | undefined) {
 }
 
 export default async function UsersPage() {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) {
-    redirect("/login");
-  }
-
-  // Checked here too, not only in (app)/layout: layouts and pages render in
-  // parallel, so the layout's redirects don't stop this page from running.
-  const { data: me } = await supabase
-    .from("profiles")
-    .select("role, deactivated_at, must_change_password")
-    .eq("id", user.id)
-    .single();
-  if (me?.role !== "admin" || me.deactivated_at || me.must_change_password) {
-    redirect("/dashboard");
-  }
+  const { supabase, user } = await requirePage("users");
 
   // Both are admin-only in the database: list_users() re-checks is_admin(),
   // and admin_actions has a select policy for admins only.
