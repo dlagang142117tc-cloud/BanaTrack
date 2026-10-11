@@ -61,3 +61,19 @@ Done means:
 - [ ] Blocks are colored by real incident data (count or highest severity) using the placeholder block list
 - [ ] Clicking a block shows its real incidents
 - [ ] The layout is easy to replace with the plantation's real block layout later
+
+## Create incident from screening
+Later item, proposed during "Screening and Review Queue".
+Done means:
+- [ ] A confirmed or corrected screening has a "Create incident from this screening" button (reviewer roles)
+- [ ] The Incident Log form opens pre-filled with the block, the human-confirmed label as suspected disease, and a note referencing the SCR code
+- [ ] The incident stores which screening it came from (new nullable incidents.screening_id column; tell Denns before adding the migration)
+- [ ] The screening shows a link to its incident
+
+## My recent screenings
+Later item, proposed during "Screening and Review Queue".
+Field Personnel can't open the Review Queue, so today they never see what happened to their screenings.
+Done means:
+- [ ] Disease Screening lists the user's own recent screenings with the screening result, human-confirmed status and lab-confirmed status
+- [ ] Users only see their own screenings (new select policy "submitters can view their own screenings"; tell Denns before adding the migration)
+- [ ] No review actions or other people's screenings are shown

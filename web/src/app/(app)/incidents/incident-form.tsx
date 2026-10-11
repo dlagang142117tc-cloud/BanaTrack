@@ -5,6 +5,7 @@ import { Camera, Check, Loader2, Plus, X } from "lucide-react";
 import { Card, buttonStyles, cx, inputStyles, labelStyles } from "@/components/ui";
 import { createClient } from "@/lib/supabase/client";
 import { todayIso } from "@/lib/dates";
+import { EXT_BY_TYPE, PHOTO_ACCEPT, TYPE_BY_EXT, photoType } from "@/lib/photos";
 import {
   ACTIONS,
   BLOCKS,
@@ -13,7 +14,6 @@ import {
   MAX_PHOTO_BYTES,
   MAX_PHOTOS,
   PHOTO_BUCKET,
-  PHOTO_TYPES,
   SEVERITIES,
   SUSPECTED_DISEASES,
   symptomsProblem,
@@ -26,22 +26,6 @@ interface PickedPhoto {
   file: File;
   preview: string;
   ext: string;
-}
-
-const EXT_BY_TYPE: Record<string, string> = {
-  "image/jpeg": "jpg",
-  "image/png": "png",
-  "image/webp": "webp",
-  "image/heic": "heic",
-  "image/heif": "heif",
-};
-const TYPE_BY_EXT: Record<string, string> = { jpg: "image/jpeg", jpeg: "image/jpeg", png: "image/png", webp: "image/webp", heic: "image/heic", heif: "image/heif" };
-
-/** Some browsers leave `type` empty for HEIC photos, so fall back to the extension. */
-function photoType(file: File) {
-  if (PHOTO_TYPES.includes(file.type)) return file.type;
-  const ext = file.name.split(".").pop()?.toLowerCase() ?? "";
-  return TYPE_BY_EXT[ext] ?? null;
 }
 
 export function IncidentForm({ userId, reporterName }: { userId: string; reporterName: string }) {
@@ -243,7 +227,7 @@ export function IncidentForm({ userId, reporterName }: { userId: string; reporte
                   <input
                     ref={fileInput}
                     type="file"
-                    accept={`${PHOTO_TYPES.join(",")},.heic,.heif`}
+                    accept={PHOTO_ACCEPT}
                     multiple
                     onChange={(e) => addPhotos(e.target.files)}
                     className="sr-only"

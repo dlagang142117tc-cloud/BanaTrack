@@ -43,3 +43,13 @@ export async function requirePage(page: PageKey) {
   if (!can(me.profile?.role, PAGES[page].permission)) redirect(`/dashboard?denied=${page}`);
   return me;
 }
+
+/**
+ * For server actions, which can be called directly: the signed-in user when
+ * the account is active and needs no password change, otherwise null.
+ */
+export async function getActiveUser() {
+  const me = await getCurrentUser();
+  if (!me?.profile || me.profile.deactivated_at || me.profile.must_change_password) return null;
+  return { supabase: me.supabase, user: me.user, profile: me.profile, role: me.profile.role as string };
+}

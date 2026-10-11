@@ -5,6 +5,7 @@ import type { User } from "@supabase/supabase-js";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { todayIso } from "@/lib/dates";
+import { isOwnPhotoPath } from "@/lib/photos";
 import { can, canDeleteIncident, canEditIncident } from "@/lib/permissions";
 import { getWeatherSnapshot } from "@/lib/weather";
 import {
@@ -76,7 +77,6 @@ async function requireActiveUser(): Promise<
 }
 
 const isIsoDate = (v: string) => /^\d{4}-\d{2}-\d{2}$/.test(v) && !Number.isNaN(Date.parse(`${v}T00:00:00Z`));
-const PHOTO_NAME = /^[0-9a-f-]{36}\.(jpg|jpeg|png|webp|heic|heif)$/;
 
 /** The observation fields shared by new incidents and edits. */
 function validateObservation(input: Omit<IncidentEditInput, "id" | "status">): string | null {
@@ -105,11 +105,7 @@ function validate(input: NewIncidentInput, userId: string, today: string): strin
     return `You can attach up to ${MAX_PHOTOS} photos.`;
   }
   // Photos must sit in the caller's own folder (the storage policy enforces this too).
-  const ownPhotos = input.photoPaths.every((p) => {
-    const [folder, name, ...rest] = String(p).split("/");
-    return folder === userId && rest.length === 0 && PHOTO_NAME.test(name ?? "");
-  });
-  if (!ownPhotos) return "One of the photos could not be matched to your upload.";
+  if (!input.photoPaths.every((p) => isOwnPhotoPath(p, userId))) return "One of the photos could not be matched to your upload.";
   return null;
 }
 
