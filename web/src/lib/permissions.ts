@@ -1,4 +1,5 @@
 import { isRole, type Role } from "./roles";
+import type { AiStatus, ReviewDecision, ReviewStatus } from "./screening-options";
 
 // The role matrix from docs/role-matrix.md. Every page, sidebar link and
 // server action checks these with can(); nothing else compares role names.
@@ -18,9 +19,14 @@ export const PERMISSIONS = {
   "incidents.editAny": ["disease_in_charge", "supervisor", "admin"],
   // DB: can_delete_any_incident() in 006_role_based_access.sql
   "incidents.deleteAny": ["supervisor", "admin"],
+  // DB: can_view_screenings() in 007_screening_review_queue.sql
   "review.view": ["disease_in_charge", "supervisor", "admin"],
-  // Not enforced anywhere yet: the Review Queue is still sample data.
+  // Review pending cases. DB: screening_review_problem() in 007
   "review.act": ["disease_in_charge", "supervisor"],
+  // Decide escalated cases and override closed ones. DB: screening_review_problem() in 007
+  "review.decideEscalated": ["supervisor"],
+  // DB: can_record_lab_results() in 007
+  "lab.record": ["disease_in_charge", "supervisor"],
   "map.view": EVERYONE,
   // Viewing includes PDF export.
   "reports.view": ["disease_in_charge", "supervisor", "admin"],
@@ -41,6 +47,33 @@ export function canEditIncident(role: string | null | undefined, userId: string,
 
 export function canDeleteIncident(role: string | null | undefined, userId: string, reportedBy: string) {
   return reportedBy === userId || can(role, "incidents.deleteAny");
+}
+
+/**
+ * Why this user may not add this review decision, or null when they may.
+ * Same rules as screening_review_problem() in 007_screening_review_queue.sql.
+ */
+export function screeningReviewProblem(
+  role: string | null | undefined,
+  userId: string,
+  screening: { submittedBy: string; reviewStatus: ReviewStatus; aiStatus: AiStatus },
+  decision: ReviewDecision,
+): string | null {
+  if (!can(role, "review.act")) return "Only Disease In-Charge and Supervisors can review screenings.";
+  if (screening.submittedBy === userId) return "You can't review a screening you submitted.";
+  if (decision === "confirmed" && screening.aiStatus === "abstained") {
+    return "An inconclusive screening result can't be confirmed; correct it or reject it.";
+  }
+  if (screening.reviewStatus === "escalated") {
+    if (!can(role, "review.decideEscalated")) return "This case is escalated; only a Supervisor can decide it.";
+    if (decision === "escalated") return "This case is already escalated.";
+  } else if (screening.reviewStatus !== "pending") {
+    if (!can(role, "review.decideEscalated")) return "This case is closed; only a Supervisor can override the decision.";
+    if (decision === "escalated") {
+      return "A closed case can't be escalated; a Supervisor can override the decision instead.";
+    }
+  }
+  return null;
 }
 
 /** Pages behind a permission. Opening one without it redirects to /dashboard?denied=<key>. */

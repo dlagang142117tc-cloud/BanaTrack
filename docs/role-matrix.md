@@ -1,6 +1,8 @@
 # BanaTrack — Role Matrix
 
 Status: **Approved by Denns on 2026-10-11** (roadmap task "Role-based access").
+Review and lab rules added on 2026-10-11 (roadmap task "Screening and Review
+Queue").
 Rules marked *team default* are our own choice. They still need to be
 **confirmed with the plantation**.
 
@@ -24,7 +26,11 @@ redirects to the dashboard)
 | Incident Log: **edit** anyone's incident | — | ✅ | ✅ | ✅ | Team default, confirm with plantation |
 | Incident Log: **delete** anyone's incident | — | — | ✅ | ✅ | Team default, confirm with plantation |
 | Review Queue: view | — | ✅ | ✅ | ✅ | Paper §4.5; Admin view is a team default, confirm with plantation |
-| Review Queue: confirm / correct / reject / escalate | — | ✅ | ✅ | 👁 (no) | Paper §4.5 |
+| Review Queue: confirm / correct / reject / escalate a **pending** case | — | ✅ | ✅ | 👁 (no) | Paper §4.5 |
+| Review Queue: decide an **escalated** case | — | — | ✅ | 👁 (no) | Team default, confirm with plantation |
+| Review Queue: **override** a closed decision (adds a new review; history kept) | — | — | ✅ | 👁 (no) | Team default, confirm with plantation |
+| Review a screening **you submitted yourself** | — | — | — | — | Team default, confirm with plantation |
+| Record a **lab result** (§4.9 lab-confirmed status) | — | ✅ | ✅ | 👁 (no) | Team default, confirm with plantation |
 | Plantation Map: view | ✅ | ✅ | ✅ | ✅ | Team default, confirm with plantation |
 | Reports: view and export | — | ✅ | ✅ | ✅ | Team default, confirm with plantation |
 | Users: manage accounts and roles | — | — | — | ✅ | Paper §4.9 (role-based access); Admin-only is a team default |
@@ -58,8 +64,11 @@ Sections from the panel's technical review paper:
 - **§4.9 Role-based access** is an existing objective. The **screening
   result**, **human-confirmed status** and **lab-confirmed status** must stay
   separate.
-  → This task is the role-based access itself. Keeping the three statuses
-  separate is a data rule for the "Screening and Review Queue" task.
+  → The three statuses are separate columns, each with one writer: the
+  screening result is written once by the server and never changes; the
+  human-confirmed status comes only from review records; the lab-confirmed
+  status comes only from lab-result records. Review and lab records are
+  append-only (migration 007).
 
 ## 3. Decisions and open questions
 
@@ -73,14 +82,23 @@ Sections from the panel's technical review paper:
 5. "Designated disease personnel" (§4.5) is read as the Disease In-Charge
    role.
 
-**Still open (to be settled in the "Screening and Review Queue" task):**
+6. Lab-confirmed status (§4.9) is recorded by Disease In-Charge and
+   Supervisor.
+7. No self-review: nobody can act on a screening they submitted themselves,
+   Supervisors included.
+8. Escalated cases go to the Supervisor; only a Supervisor decides an
+   escalated case.
+9. Confirm / correct / reject close a case for Disease In-Charge. A
+   Supervisor can override a closed decision by adding a new review; the
+   earlier decision stays in the history.
 
-6. **Lab-confirmed status (§4.9):** who records it — Disease In-Charge only,
-   or Supervisor too?
-7. **Self-review:** can a reviewer confirm a screening they submitted
-   themselves?
-8. **Escalation recipients:** when a case is escalated, who receives it (a
-   Supervisor, the Disease In-Charge, an outside lab)?
+**Still open (ask the plantation):**
+
+10. **How many Supervisors are there?** Rules 7 and 8 together mean that when
+    a Supervisor submits a screening and it gets escalated (or needs an
+    override), a *second* Supervisor has to decide it. With only one
+    Supervisor, such a case stays open. (A second demo Supervisor account,
+    supervisor2, exists for testing.)
 
 ## 4. How it is enforced
 
@@ -96,7 +114,9 @@ Sections from the panel's technical review paper:
 | `incidents.editAny` | Disease In-Charge, Supervisor, Admin |
 | `incidents.deleteAny` | Supervisor, Admin |
 | `review.view` | Disease In-Charge, Supervisor, Admin |
-| `review.act` | Disease In-Charge, Supervisor |
+| `review.act` (pending cases) | Disease In-Charge, Supervisor |
+| `review.decideEscalated` (escalated cases, overrides) | Supervisor |
+| `lab.record` | Disease In-Charge, Supervisor |
 | `map.view` | everyone |
 | `reports.view` (includes PDF export) | Disease In-Charge, Supervisor, Admin |
 | `users.manage` | Admin |
@@ -105,13 +125,16 @@ How the file is used:
 
 - **Who checks it:** pages, the sidebar and server actions call
   `can(role, permission)`. Incidents use `canEditIncident()` /
-  `canDeleteIncident()`, which also let reporters manage their own.
+  `canDeleteIncident()`, which also let reporters manage their own. Reviews
+  use `screeningReviewProblem()`, which combines `review.act`,
+  `review.decideEscalated`, the no-self-review rule and the case's status.
 - **Unknown or missing role:** `can()` returns false.
 - **The dashboard has no permission.** It is open to every role, because
   blocked pages redirect there.
 - **Rules the database also enforces** are marked `DB:` in the file:
-  `incidents.editAny`, `incidents.deleteAny` and `users.manage`. Changing one
-  of them also needs a new migration.
+  `incidents.editAny`, `incidents.deleteAny`, `review.view`, `review.act`,
+  `review.decideEscalated`, `lab.record` and `users.manage`. Changing one of
+  them also needs a new migration.
 
 ### 4.2 Sidebar and blocked URLs
 
@@ -134,6 +157,11 @@ How the file is used:
   `deleteIncident` checks `canDeleteIncident`. If the UI is bypassed they
   return "You don't have permission to …".
 - **Users** (`users/actions.ts`): the actions check `users.manage`.
+- **Screening** (`screening/actions.ts`): `submitScreening` checks
+  `screening.submit`, creates the mock result on the server and saves it with
+  the service role (users can't write screenings at all).
+- **Review Queue** (`review/actions.ts`): `reviewScreening` checks
+  `screeningReviewProblem()`; `recordLabResult` checks `lab.record`.
 
 ### 4.4 Database rules (migration 006)
 
@@ -155,16 +183,19 @@ photo" button yet; photos only go when their incident is deleted.
   table, which Field Personnel must read for the Incident Log. The
   restriction controls the page only, not access to the data. Reports contain
   nothing the Incident Log doesn't already show.
-- **Review Queue.** It is still sample data with no table (see 4.5).
 
-### 4.5 Review Queue (still sample data)
+### 4.5 Screenings and reviews (migration 007)
 
-- **Now:** the page is restricted with `review.view`, and the sample action
-  buttons only show with `review.act`.
-- **"Screening and Review Queue" task:** its server actions must check
-  `can(role, "review.act")`. Its migration must add a matching SQL helper
-  (e.g. `can_review_screenings()`) for the RLS policies, listing the same
-  roles as `review.act`.
+`supabase/migrations/007_screening_review_queue.sql`:
+
+| Rule | Database |
+|---|---|
+| Who reads screenings, reviews, lab results | `can_view_screenings()` (= `review.view`) |
+| Review rules (role, self-review, escalated, closed/override, inconclusive can't be confirmed) | `screening_review_problem()`, used by the insert policy and the `prepare_screening_review` trigger |
+| Lab results | `can_record_lab_results()` (= `lab.record`) |
+| Screening result never changes | users can't write `screenings`; `guard_screening_change` blocks direct updates and deletes for every role |
+| Append-only history | no update/delete policies; `guard_append_only` blocks update, delete and truncate for every role |
+| Photos | private `screening-photos` bucket; upload to your own folder; reviewer roles and the uploader can view; the uploader can delete only a photo no screening uses |
 
 ## 5. Test plan (demo accounts)
 
@@ -244,3 +275,116 @@ rollback;
 - The `/users` actions (role change, reset, deactivate, delete) still work for
   Admin.
 - `npm run lint`, `npx tsc --noEmit` and `npm run build` pass from `web/`.
+
+## 6. Test plan: Screening and Review Queue (migration 007)
+
+Accounts: **FP** (field personnel), **DIC** (disease in-charge), **SUP**
+(supervisor), **SUP2** (supervisor2), **ADMIN**.
+
+### 6.1 Browser
+
+1. **FP** submits a screening (photo, block, plant part, an observation). It
+   shows "Saved as SCR-…", the "Mock result" tag, and the observation as
+   evidence. FP still has no Review Queue.
+2. **DIC**, **SUP** and **ADMIN** each submit one screening too.
+3. **DIC** in the Review Queue:
+   - FP's case: **Confirm** (or Correct, if it's inconclusive). It moves to
+     Reviewed; the history shows DIC, the time and the model version.
+   - Own case: no decision buttons; "You can't review a screening you
+     submitted."
+   - ADMIN's case: **Escalate** with a note. It shows "Escalated — Supervisor
+     decision needed", and DIC sees "only a Supervisor can decide it".
+   - A closed case: no buttons.
+4. **SUP** in the Review Queue:
+   - The escalated case is listed first. **Correct** it: the screening result
+     is unchanged next to the human review box.
+   - DIC's case: **Reject** with a note.
+   - FP's case closed by DIC: **Override decision** → choose a decision. The
+     history shows both decisions.
+   - Own case: no buttons.
+5. **SUP2** can decide SUP's own case (escalate it as DIC first).
+6. **ADMIN** sees every case and its history, with no decision or lab buttons
+   and the "View only" note.
+7. **Lab results:** DIC and SUP can record one. The lab box shows it,
+   separate from the human review. ADMIN has no button.
+8. **Dashboard:** DIC, SUP and ADMIN see the real "Awaiting review" count
+   (high priority and escalated) and the top cases; the numbers drop as cases
+   are reviewed. FP sees no review widgets. ADMIN's governance card shows
+   `fusion-v0.0-mock`, the real abstention rate and the 60% threshold, tagged
+   as a mock model.
+9. **Inconclusive** screenings show High priority and "Inconclusive — system
+   abstained", and can't be confirmed (only corrected or rejected).
+
+### 6.2 Database check (SQL editor, no UI)
+
+Each block works on a pending screening submitted by Field Personnel (or by
+Disease In-Charge for B), acts as a role, and ends with the statement being
+tested. Run one block at a time; nothing is saved (`rollback`, or the error
+aborts the transaction). Run after the browser tests, so data exists.
+
+| # | Test | Expected |
+|---|---|---|
+| A | FP adds a review | error: "Only Disease In-Charge and Supervisors can review screenings." |
+| B | DIC reviews own screening | error: "You can't review a screening you submitted." |
+| C | DIC escalates, then decides it | error: "only a Supervisor can decide it" |
+| D | DIC escalates, SUP corrects | 1 row; the status columns show `corrected`, the new label and the **unchanged** `ai_label` |
+| E | DIC rejects, then DIC acts again | error: "This case is closed …" |
+| F | DIC rejects, SUP overrides | 2 reviews in the history for that screening |
+| G | Edit a past review (any role) | error: "screening_reviews is append-only …" |
+| H | Change a screening result (any role) | error: "Screenings can't be edited directly; add a review or lab result instead." |
+| I | FP records a lab result | error: "Only Disease In-Charge and Supervisors can record lab results." |
+
+```sql
+-- Setup used by every block (run it at the start of each block):
+begin;
+select set_config('test.sid', (
+  select s.id::text from public.screenings s join public.profiles p on p.id = s.submitted_by
+  where p.role = 'field_personnel' and s.review_status = 'pending' and s.ai_status = 'result'
+  order by s.id limit 1), true);
+-- "act as <role>" = these two lines (use "reset role;" first if you already switched):
+--   select set_config('request.jwt.claims', json_build_object('role', 'authenticated', 'sub',
+--     (select id from public.profiles where role = '<role>' and deactivated_at is null order by created_at limit 1))::text, true);
+--   set local role authenticated;
+
+-- A: act as field_personnel, then
+insert into public.screening_reviews (screening_id, decision)
+  values (current_setting('test.sid')::bigint, 'confirmed');
+
+-- B: replace the setup's 'field_personnel' with 'disease_in_charge'; act as that submitter:
+select set_config('request.jwt.claims', json_build_object('role', 'authenticated', 'sub',
+  (select submitted_by from public.screenings where id = current_setting('test.sid')::bigint))::text, true);
+set local role authenticated;
+insert into public.screening_reviews (screening_id, decision)
+  values (current_setting('test.sid')::bigint, 'rejected');
+
+-- C: act as disease_in_charge, then
+insert into public.screening_reviews (screening_id, decision) values (current_setting('test.sid')::bigint, 'escalated');
+insert into public.screening_reviews (screening_id, decision) values (current_setting('test.sid')::bigint, 'confirmed');
+
+-- D: act as disease_in_charge, escalate (first line of C), then reset role; act as supervisor, then
+insert into public.screening_reviews (screening_id, decision, corrected_label)
+  values (current_setting('test.sid')::bigint, 'corrected', 'Panama-like (Fusarium) wilt pattern');
+select review_status, human_label, ai_label from public.screenings where id = current_setting('test.sid')::bigint;
+
+-- E: act as disease_in_charge, then
+insert into public.screening_reviews (screening_id, decision) values (current_setting('test.sid')::bigint, 'rejected');
+insert into public.screening_reviews (screening_id, decision) values (current_setting('test.sid')::bigint, 'rejected');
+
+-- F: act as disease_in_charge, reject (first line of E), then reset role; act as supervisor, then
+insert into public.screening_reviews (screening_id, decision) values (current_setting('test.sid')::bigint, 'confirmed');
+select decision, reviewer_name from public.screening_reviews
+  where screening_id = current_setting('test.sid')::bigint order by id;
+
+-- G: (no "act as"; runs as the SQL editor's own role)
+update public.screening_reviews set note = 'edited' where id = (select min(id) from public.screening_reviews);
+
+-- H: (no "act as")
+update public.screenings set ai_label = 'edited' where id = current_setting('test.sid')::bigint;
+
+-- I: act as field_personnel, then
+insert into public.screening_lab_results (screening_id, lab_result)
+  values (current_setting('test.sid')::bigint, 'negative');
+
+-- End every block with:
+rollback;
+```

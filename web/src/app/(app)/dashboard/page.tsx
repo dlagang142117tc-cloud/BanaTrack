@@ -12,14 +12,13 @@ import {
   cx,
 } from "@/components/ui";
 import { STATS_WINDOW_DAYS, TOP_SEVERITY, getDashboardStats, type DashboardStats } from "@/lib/incident-stats";
-import { awaitingReviewSample, modelGovernance, reviewCases } from "@/lib/mock-data";
+import { PRIORITY_LABELS } from "@/lib/screening-options";
+import { getAwaitingReview, getModelGovernance, type AwaitingReview } from "@/lib/screenings";
 import { PLANTATION_LOCATION, assessDiseaseRisk, getForecast } from "@/lib/weather";
-
-const PRIORITY_ORDER = { High: 0, Medium: 1, Low: 2 };
 
 type Tone = "warn" | "good" | "neutral";
 
-function buildStatCards(stats: DashboardStats | null, showReview: boolean) {
+function buildStatCards(stats: DashboardStats | null, awaiting: AwaitingReview | null | undefined) {
   const value = (n: number | undefined) => (n === undefined ? "—" : n);
   const change = stats ? stats.recent - stats.previous : 0;
   return [
@@ -57,17 +56,21 @@ function buildStatCards(stats: DashboardStats | null, showReview: boolean) {
       note: "as recorded in the field",
       tone: (stats?.topSeverityRecent ? "warn" : "neutral") as Tone,
     },
-    ...(showReview
-      ? [
+    // undefined: the role can't see reviews, so the card is left out.
+    ...(awaiting === undefined
+      ? []
+      : [
           {
             label: "Awaiting review",
-            value: awaitingReviewSample.value,
-            note: awaitingReviewSample.note,
-            tone: "warn" as Tone,
-            sample: true,
+            value: value(awaiting?.total),
+            note: !awaiting
+              ? "Unavailable"
+              : [`${awaiting.high} high priority`, awaiting.escalated ? `${awaiting.escalated} escalated` : null]
+                  .filter(Boolean)
+                  .join(" · "),
+            tone: (awaiting?.total ? "warn" : "neutral") as Tone,
           },
-        ]
-      : []),
+        ]),
   ];
 }
 
@@ -83,19 +86,23 @@ export default async function DashboardPage({
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
   const { supabase, profile } = await requireUser();
-  const [{ denied }, forecast, stats] = await Promise.all([searchParams, getForecast(), getDashboardStats(supabase)]);
+  const showReview = can(profile?.role, "review.view");
+  const showGovernance = can(profile?.role, "dashboard.governance");
+  const [{ denied }, forecast, stats, awaiting, governance] = await Promise.all([
+    searchParams,
+    getForecast(),
+    getDashboardStats(supabase),
+    showReview ? getAwaitingReview(supabase) : undefined,
+    showGovernance ? getModelGovernance(supabase) : null,
+  ]);
   // Set by requirePage() when the role may not open a page.
   const deniedPage = isPageKey(denied) ? PAGES[denied] : null;
-  const showReview = can(profile?.role, "review.view");
-  const statCards = buildStatCards(stats, showReview);
+  const statCards = buildStatCards(stats, awaiting);
 
   const firstName = profile?.full_name?.split(" ")[0];
   const today = forecast?.days[0];
   const risk = forecast ? assessDiseaseRisk(forecast.days) : null;
   const tone = RISK_TONE[risk?.level ?? "Moderate"];
-  const topCases = [...reviewCases]
-    .sort((a, b) => PRIORITY_ORDER[a.priority] - PRIORITY_ORDER[b.priority] || b.confidence - a.confidence)
-    .slice(0, 4);
 
   return (
     <div className="space-y-6">
@@ -195,7 +202,6 @@ export default async function DashboardPage({
             >
               <div className="flex flex-wrap items-start justify-between gap-2">
                 <p className="text-xs font-medium text-muted sm:text-sm">{s.label}</p>
-                {s.sample && <SampleTag />}
               </div>
               <p className="mt-2 font-display text-3xl font-semibold tabular-nums text-ink">{s.value}</p>
               <p
@@ -275,24 +281,41 @@ export default async function DashboardPage({
           <Card
             className="xl:col-span-2"
             title="Top review priority"
-            description="AI-flagged cases waiting on a reviewer"
-            action={<SampleTag />}
+            description="Screenings waiting on a reviewer, by case-review priority"
+            action={<SampleTag label="Mock results" />}
           >
-            <ul className="divide-y divide-line">
-              {topCases.map((c) => (
-                <li key={c.id} className="flex items-center gap-3 py-3 first:pt-0 last:pb-0">
-                  <div className="min-w-0 flex-1">
-                    <div className="flex flex-wrap items-center gap-2">
-                      <span className="font-mono text-xs text-muted">{c.id}</span>
-                      <PriorityBadge priority={c.priority} />
+            {!awaiting ? (
+              <p className="rounded-xl bg-canvas p-4 text-sm text-muted">
+                Screenings couldn&apos;t be loaded. Try refreshing the page.
+              </p>
+            ) : awaiting.top.length === 0 ? (
+              <p className="rounded-xl border border-dashed border-line p-4 text-sm text-muted">
+                No screenings waiting for review.
+              </p>
+            ) : (
+              <ul className="divide-y divide-line">
+                {awaiting.top.map((c) => (
+                  <li key={c.id} className="flex items-center gap-3 py-3 first:pt-0 last:pb-0">
+                    <div className="min-w-0 flex-1">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span className="font-mono text-xs text-muted">{c.code}</span>
+                        <PriorityBadge priority={PRIORITY_LABELS[c.result.priority]} />
+                        {c.escalated && (
+                          <span className="rounded-md bg-red-100 px-2 py-0.5 text-xs font-semibold text-red-800">
+                            Escalated
+                          </span>
+                        )}
+                      </div>
+                      <p className="mt-1 truncate text-sm font-medium text-ink">
+                        {c.result.status === "abstained" ? "Inconclusive — system abstained" : c.result.label}
+                      </p>
+                      <p className="text-xs text-muted">Block {c.block} · {c.submittedAt}</p>
                     </div>
-                    <p className="mt-1 truncate text-sm font-medium text-ink">{c.label}</p>
-                    <p className="text-xs text-muted">Block {c.block} · {c.submittedAt}</p>
-                  </div>
-                  <ConfidenceMeter value={c.confidence} />
-                </li>
-              ))}
-            </ul>
+                    <ConfidenceMeter value={c.result.confidence} />
+                  </li>
+                ))}
+              </ul>
+            )}
             <Link
               href="/review"
               className="mt-4 inline-flex items-center gap-1 text-sm font-semibold text-leaf-700 hover:text-leaf-900"
@@ -303,25 +326,39 @@ export default async function DashboardPage({
         )}
       </div>
 
-      {can(profile?.role, "dashboard.governance") && (
+      {showGovernance && (
         <Card
           title="Model governance"
           description="Visible to admins only"
-          action={<SampleTag label="Placeholder — no model deployed" />}
+          action={governance?.isMock ? <SampleTag label="Mock model — no real model deployed" /> : undefined}
         >
-          <dl className="grid grid-cols-2 gap-4 sm:grid-cols-4">
-            {[
-              ["Active version", modelGovernance.activeVersion],
-              ["Deployed", modelGovernance.deployedOn],
-              ["Abstention rate", `${Math.round(modelGovernance.abstentionRate * 100)}%`],
-              ["Reviewer agreement", "—"],
-            ].map(([k, v]) => (
-              <div key={k}>
-                <dt className="text-xs text-muted">{k}</dt>
-                <dd className="mt-1 font-mono text-sm text-ink">{v}</dd>
-              </div>
-            ))}
-          </dl>
+          {!governance ? (
+            <p className="rounded-xl bg-canvas p-4 text-sm text-muted">
+              Model information couldn&apos;t be loaded. Try refreshing the page.
+            </p>
+          ) : (
+            <dl className="grid grid-cols-2 gap-4 sm:grid-cols-4">
+              {[
+                ["Active version", governance.activeVersion ?? "None active"],
+                ["Deployed", governance.deployedAt ?? "Not deployed"],
+                [
+                  "Abstention rate",
+                  governance.abstentionRate === null
+                    ? "No screenings yet"
+                    : `${Math.round(governance.abstentionRate * 100)}% of ${governance.screenings}`,
+                ],
+                [
+                  "Abstention threshold",
+                  governance.abstentionThreshold === null ? "—" : `${Math.round(governance.abstentionThreshold * 100)}%`,
+                ],
+              ].map(([k, v]) => (
+                <div key={k}>
+                  <dt className="text-xs text-muted">{k}</dt>
+                  <dd className="mt-1 font-mono text-sm text-ink">{v}</dd>
+                </div>
+              ))}
+            </dl>
+          )}
         </Card>
       )}
     </div>

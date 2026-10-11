@@ -5,6 +5,77 @@ Update this at the end of each session.
 
 ---
 
+## Session: 2026-10-11 — Screening and Review Queue (branch `feature/screening-review-queue`)
+
+Migration 007 has been run in Supabase. PR open into `main`, not merged.
+Still a MOCK model (`fusion-v0.0-mock`): no image analysis.
+
+### Added
+
+- `supabase/migrations/007_screening_review_queue.sql`: `model_versions`,
+  `screenings`, append-only `screening_reviews` and `screening_lab_results`,
+  private `screening-photos` bucket, review and lab rules in the database.
+- `web/src/lib/screening-options.ts` (lists, types, labels),
+  `lib/mock-model.ts` (mock results with neutral evidence plus the user's
+  real observations), `lib/screenings.ts` (queue, dashboard and governance
+  loaders), `lib/photos.ts` (photo helpers shared with the Incident Log),
+  `components/screening-result.tsx` (result and evidence panels).
+- `screening/actions.ts` (`submitScreening`) and `review/actions.ts`
+  (`reviewScreening`, `recordLabResult`).
+- Permissions: `review.decideEscalated` (Supervisor), `lab.record` (Disease
+  In-Charge, Supervisor), and `screeningReviewProblem()`, which mirrors the
+  database rules.
+
+### Changed
+
+- Disease Screening saves the photo, block, plant part, observations and the
+  mock screening result (created on the server, saved with the service role),
+  and shows the SCR code. Preview buttons are labeled "Preview only — not
+  saved".
+- The Review Queue shows real screenings: Pending / Reviewed / All, sorted by
+  case-review priority (escalated cases first for Supervisors). It has three
+  separate status boxes (screening result, human review, lab result),
+  decision forms with notes, Supervisor override, lab-result form, and
+  evidence plus full history.
+- Dashboard: real "Awaiting review" (with high-priority and escalated
+  counts), real "Top review priority", and the governance card reads
+  `model_versions` and a real abstention rate (still tagged mock).
+- `lib/mock-data.ts`: removed sample review cases, sample screening results
+  and the sample governance numbers.
+- `users/activity.ts`: accounts with screenings, reviews or lab results are
+  deactivated instead of deleted.
+- Docs: `docs/role-matrix.md` (decisions 6–9, open question about the number
+  of Supervisors, enforcement, test plan §6), `docs/web-roadmap.md` (later
+  items "Create incident from screening" and "My recent screenings"),
+  `docs/sql-checks-007.sql` (database checks A–I, ready to paste).
+
+### Tested
+
+- `npx tsc --noEmit`, `npm run lint` and `npm run build` pass.
+- Denns ran browser test rounds 1–4 with the demo accounts (including
+  supervisor2): all passed.
+- SQL checks A–I (`docs/sql-checks-007.sql`) all passed. The final query
+  showed only SCR-0001 to SCR-0004 (review counts 2, 1, 2, 2), with no
+  leftovers from the checks.
+
+### Known issues / left to do
+
+- **Later: case-review priority is not computed.** Each mock result has a
+  fixed priority (Moko-like and Inconclusive → High, Panama-like → Medium),
+  and all four test screenings came out High. Real case-review priority
+  logic comes with the real model.
+- **Later: cleanup script before the final demo.** Screenings can't be
+  deleted by anyone (audit trail), so the test screenings stay. Removing
+  them needs a script that temporarily disables the guard triggers in the
+  SQL editor.
+- A case submitted by the only Supervisor can't be decided once escalated
+  (needs a second Supervisor).
+- Field Personnel get no feedback on their screenings yet (roadmap: "My
+  recent screenings").
+- Queue shows the 300 most recent screenings; no paging yet.
+
+---
+
 ## Session: 2026-10-11 — Role-based access (branch `feature/role-based-access`)
 
 Migration 006 has been run in Supabase. PR open into `main`, not merged.

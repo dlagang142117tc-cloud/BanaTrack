@@ -4,14 +4,15 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 /**
  * Tables that record a user's field work. Accounts with rows in any of these
  * must be deactivated instead of deleted, to keep the audit trail intact.
- * Add each table here once it exists, e.g.
- *   { table: "screenings", column: "submitted_by" },
- *   { table: "review_actions", column: "reviewer_id" },
+ * Add each new table that references a user here.
  */
 const ACTIVITY_TABLES: { table: string; column: string }[] = [
   { table: "incidents", column: "reported_by" },
   { table: "incidents", column: "last_edited_by" },
   { table: "incident_photos", column: "uploaded_by" },
+  { table: "screenings", column: "submitted_by" },
+  { table: "screening_reviews", column: "reviewer_id" },
+  { table: "screening_lab_results", column: "recorded_by" },
 ];
 
 /** "unknown" when a lookup failed. Pass the service-role client so every table is visible. */
