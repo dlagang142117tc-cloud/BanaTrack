@@ -2,7 +2,7 @@ import type { ReactNode } from "react";
 import Link from "next/link";
 import { FileBarChart, SearchX } from "lucide-react";
 import { Card, PageHeader } from "@/components/ui";
-import { createClient } from "@/lib/supabase/server";
+import { requirePage } from "@/lib/auth";
 import { defaultReportFilters, getReport, parseReportFilters } from "@/lib/incident-stats";
 import { STATUSES } from "@/lib/incident-options";
 import { OTHER_SERIES, REPORT_SERIES } from "@/lib/report-series";
@@ -14,9 +14,9 @@ export default async function ReportsPage({
 }: {
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
+  const { supabase } = await requirePage("reports");
   const parsed = parseReportFilters(await searchParams);
   const filters = parsed?.filters ?? defaultReportFilters();
-  const supabase = await createClient();
   const report = parsed && !parsed.error ? await getReport(supabase, parsed.filters) : null;
 
   // "Other" only appears when some incidents have a value no longer in the list.

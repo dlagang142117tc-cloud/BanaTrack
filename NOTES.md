@@ -5,6 +5,57 @@ Update this at the end of each session.
 
 ---
 
+## Session: 2026-10-11 — Role-based access (branch `feature/role-based-access`)
+
+Migration 006 has been run in Supabase. PR open into `main`, not merged.
+
+### Added
+
+- `docs/role-matrix.md` — approved role matrix, paper sources, open questions,
+  enforcement and test plan.
+- `web/src/lib/permissions.ts` — every role rule in one place (`can()`,
+  `canEditIncident()`, `canDeleteIncident()`, `PAGES`).
+- `web/src/lib/auth.ts` — `getCurrentUser()` (once per request),
+  `requireUser()`, `requirePage()` (redirects to `/dashboard?denied=<page>`).
+- `supabase/migrations/006_role_based_access.sql` — replaces
+  `can_manage_incidents()` with `can_edit_any_incident()` (Disease In-Charge,
+  Supervisor, Admin) and `can_delete_any_incident()` (Supervisor, Admin).
+  Run in Supabase by Denns on 2026-10-11.
+
+### Changed
+
+- Sidebar shows only permitted pages. Every page except the dashboard checks
+  its permission on the server. Screening, Map and Review Queue became server
+  `page.tsx` wrappers around the client views (`*-view.tsx`, `review-queue.tsx`).
+- Field Personnel: no Review Queue, no Reports, no review widgets on the
+  dashboard.
+- Admin: Review Queue is view-only (sample action buttons hidden).
+- Disease In-Charge: can edit anyone's incident and delete only their own.
+  Edit and Delete buttons are now separate.
+- The dashboard shows a notice after a blocked-page redirect. Without review
+  access, the subtitle drops "cases waiting on a reviewer" and the five stat
+  cards fill the grid (3 + 2 on desktop).
+- Incident and Users server actions use the permissions file.
+
+### Tested
+
+- `npx tsc --noEmit`, `npm run lint` and `npm run build` pass.
+- Denns tested all four demo accounts in the browser: sidebars, blocked-URL
+  redirects, incident edit/delete rules, Admin view-only Review Queue,
+  5-card grid and subtitle.
+- SQL-editor checks (`docs/role-matrix.md` §5.3), all rolled back:
+  Field Personnel update → no rows; Disease In-Charge update → 1 row;
+  Disease In-Charge delete → no rows; Supervisor delete → 1 row.
+
+### Known issues / left to do
+
+- Reports is restricted at the page only. Field Personnel can still read
+  `incidents` (needed for the Incident Log).
+- Open questions for the Screening and Review Queue task: who records
+  lab-confirmed status, self-review, escalation recipients.
+
+---
+
 ## Session: 2026-10-09 — Dashboard and Reports after the Incident Log merge (branch `feature/dashboard-reports-real-data`)
 
 Denns took over the branch.

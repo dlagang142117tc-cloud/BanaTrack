@@ -42,6 +42,7 @@ export interface IncidentRow {
   };
   /** Reporter, supervisors and admins — the same rule as the database policies. */
   canEdit: boolean;
+  canDelete: boolean;
 }
 
 // Timestamps are shown in plantation time; YYYY-MM-DD dates are formatted at UTC so they don't shift.
@@ -207,24 +208,28 @@ export function IncidentHistory({ rows, loadError, limit }: { rows: IncidentRow[
                   <WeatherCell weather={r.weather} />
                 </td>
                 <td className="px-5 py-3 text-right sm:px-6">
-                  {r.canEdit && (
+                  {(r.canEdit || r.canDelete) && (
                     <div className="flex justify-end gap-1">
-                      <button
-                        type="button"
-                        onClick={() => openEdit(r)}
-                        aria-label={`Edit ${incidentCode(r.id)}`}
-                        className={cx(buttonStyles.ghost, "px-2 py-1")}
-                      >
-                        <Pencil className="size-4" aria-hidden />
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => askDelete(r)}
-                        aria-label={`Delete ${incidentCode(r.id)}`}
-                        className={cx(buttonStyles.ghost, "px-2 py-1 text-red-700 hover:bg-red-50 hover:text-red-800")}
-                      >
-                        <Trash2 className="size-4" aria-hidden />
-                      </button>
+                      {r.canEdit && (
+                        <button
+                          type="button"
+                          onClick={() => openEdit(r)}
+                          aria-label={`Edit ${incidentCode(r.id)}`}
+                          className={cx(buttonStyles.ghost, "px-2 py-1")}
+                        >
+                          <Pencil className="size-4" aria-hidden />
+                        </button>
+                      )}
+                      {r.canDelete && (
+                        <button
+                          type="button"
+                          onClick={() => askDelete(r)}
+                          aria-label={`Delete ${incidentCode(r.id)}`}
+                          className={cx(buttonStyles.ghost, "px-2 py-1 text-red-700 hover:bg-red-50 hover:text-red-800")}
+                        >
+                          <Trash2 className="size-4" aria-hidden />
+                        </button>
+                      )}
                     </div>
                   )}
                 </td>

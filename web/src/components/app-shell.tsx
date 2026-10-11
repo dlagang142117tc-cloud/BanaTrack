@@ -17,17 +17,18 @@ import {
   X,
 } from "lucide-react";
 import { ROLE_LABELS, isRole } from "@/lib/roles";
+import { PAGES, can } from "@/lib/permissions";
 import { cx } from "./ui";
 
-// adminOnly hides the link; the page itself also redirects non-admins.
+// Links the role may not use are hidden; the pages also redirect (lib/auth.ts).
 const NAV = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
-  { href: "/screening", label: "Disease Screening", icon: ScanSearch },
-  { href: "/incidents", label: "Incident Log", icon: ClipboardList },
-  { href: "/review", label: "Review Queue", icon: ShieldCheck },
-  { href: "/map", label: "Plantation Map", icon: Map },
-  { href: "/reports", label: "Reports", icon: FileBarChart },
-  { href: "/users", label: "Users", icon: Users, adminOnly: true },
+  { ...PAGES.screening, icon: ScanSearch },
+  { ...PAGES.incidents, icon: ClipboardList },
+  { ...PAGES.review, icon: ShieldCheck },
+  { ...PAGES.map, icon: Map },
+  { ...PAGES.reports, icon: FileBarChart },
+  { ...PAGES.users, icon: Users },
 ];
 
 export function AppShell({
@@ -41,7 +42,7 @@ export function AppShell({
 }) {
   const pathname = usePathname();
   const [open, setOpen] = useState(false);
-  const nav = NAV.filter((n) => !n.adminOnly || user.role === "admin");
+  const nav = NAV.filter((n) => !("permission" in n) || can(user.role, n.permission));
   const displayName = user.name || user.email;
   const initials = displayName
     .split(/[\s@.]+/)
