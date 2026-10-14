@@ -77,3 +77,20 @@ Done means:
 - [ ] Disease Screening lists the user's own recent screenings with the screening result, human-confirmed status and lab-confirmed status
 - [ ] Users only see their own screenings (new select policy "submitters can view their own screenings"; tell Denns before adding the migration)
 - [ ] No review actions or other people's screenings are shown
+
+## Incident list in the Reports PDF
+Later item, proposed during "Reports PDF export".
+**Open question (confirm with the plantation first):** should reporter names appear in a PDF that can be shared outside the app? If not, leave the "Reported by" column out.
+Done means:
+- [ ] An "Include incident list" option on Reports, off by default
+- [ ] The PDF gets an "Incidents in this period" section after the data table: date, block, suspected disease, severity, current status (and reported by, only if approved), sorted by date
+- [ ] Same filters as the rest of the report; the list is capped (about 500 rows) with a note when the cap cuts it short
+- [ ] "Suspected disease" is labeled as a field observation, never a diagnosis
+
+## Report export logging
+Later item, proposed during "Reports PDF export".
+Today nothing records who downloaded which report.
+Done means:
+- [ ] Each PDF download records who, when, and the filters used (new table; tell Denns before adding the migration)
+- [ ] Only Admins (and Supervisors, if approved) can view the export log
+- [ ] Rows can't be edited or deleted by users (audit trail)

@@ -47,11 +47,27 @@ body {
   font-family: var(--font-sans);
 }
 
+.print-only {
+  display: none;
+}
+
 @media print {
   .no-print {
     display: none !important;
   }
+  .print-only {
+    display: block;
+  }
   body {
     background: white;
+  }
+  /* Browsers drop background colors when printing; chart bars and legend swatches need them. */
+  .print-colors {
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+  /* Fit every month on the page instead of cutting off the scrollable chart. */
+  .print-fit {
+    min-width: 0 !important;
   }
 }
