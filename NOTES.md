@@ -5,6 +5,52 @@ Update this at the end of each session.
 
 ---
 
+## Session: 2026-10-14 — Weather context placeholder (branch `feature/weather-context`)
+
+PR open into `main`, not merged. No database changes. Placeholder until the
+adviser consultation.
+
+### Changed
+
+- Dashboard: the "Disease-favorable conditions: Low / Moderate / Elevated"
+  banner is replaced by a neutral **Weather context** panel. It shows
+  forecast rain for the next 3 and next 7 days, with the note "Shown for
+  context only. The link between weather and Moko/Panama disease in BanaTrack
+  has not been validated yet; this panel will be updated after consultation."
+  It doesn't use the words risk, predicts, probability or disease-favorable.
+- `lib/weather.ts`: removed `assessDiseaseRisk()` (the humidity, temperature
+  and rain scoring, which no source supports) and its types. Added
+  `forecastRainTotal()`. The Open-Meteo forecast fetch, the 7-day weather card
+  and the incident weather snapshots are unchanged.
+
+### Added
+
+- `docs/weather-sources.md`: six sources (PestNet, FAO/TR4 Global Network,
+  Viljoen/FAO, ABGC, Farm Biosecurity, Dita et al. 2018) with links and what
+  each supports. Notes: no validated numeric thresholds, no humidity link, and
+  conflicting evidence on *Ralstonia* in water. Also the options to discuss
+  with the adviser.
+- Roadmap: Weather risk banner marked "placeholder done, final version after
+  adviser consultation".
+
+### Tested
+
+- `npx tsc --noEmit`, `npm run lint` and `npm run build` pass.
+- Denns tested in the browser (2026-10-14), passed: the Weather context panel
+  shows on the Supervisor and Field Personnel dashboards with no risk wording,
+  forecast totals (20 mm next 3 days / 35 mm next 7 days) and the note.
+
+### Known issues / left to do
+
+- **Later: final weather panel after adviser consultation** (options a/b/c
+  in `docs/weather-sources.md`). The feature title "Weather Risk Monitoring"
+  may need to change (panel paper §12).
+- `docs/BanaTrack_ClaudeCode_BuildPrompt.md` still describes a
+  "disease-favorable-conditions risk banner". Update it when the final
+  version is decided.
+
+---
+
 ## Session: 2026-10-14 — Reports PDF export (branch `feature/reports-pdf-export`)
 
 PR open into `main`, not merged. No database changes, no migration.

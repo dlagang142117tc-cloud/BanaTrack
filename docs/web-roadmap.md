@@ -50,6 +50,10 @@ Done means:
 - [ ] The PDF includes the filters used, summary numbers, chart, table, date generated and who generated it
 
 ## Weather risk banner
+**Status: placeholder done, final version after adviser consultation.** The
+risk levels were removed and the banner is now a neutral "Weather context"
+panel (forecast rain for the next 3 and 7 days). Sources and options for the
+adviser are in docs/weather-sources.md.
 Done means:
 - [ ] At least two credible sources (peer-reviewed papers, FAO, or Philippine agencies such as DA, BPI or PCAARRD) on weather conditions linked to Moko or Panama disease are listed with links in docs/weather-sources.md
 - [ ] The banner thresholds are updated to match the sources and cited in a code comment and in the banner, OR the banner is relabeled "Weather context" if no defensible thresholds are found

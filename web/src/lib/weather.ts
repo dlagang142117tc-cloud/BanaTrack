@@ -90,62 +90,16 @@ export async function getForecast(): Promise<Forecast | null> {
   }
 }
 
-// ---------------------------------------------------------------- Risk
-
-export type RiskLevel = "Low" | "Moderate" | "Elevated";
-
-export interface DiseaseRisk {
-  level: RiskLevel;
-  summary: string;
-  factors: string[];
-}
+// ---------------------------------------------------------------- Weather context
 
 /**
- * Rule-of-thumb weather indicator for wilt-disease-favorable conditions
- * (Moko / Panama spread with warm, wet, humid weather). Heuristic only —
- * thresholds are not calibrated against plantation incident data.
+ * Total forecast rainfall over the first `days` forecast days (today included),
+ * in mm. Shown on the dashboard for context only: no weather threshold for
+ * Moko or Panama disease has been validated (see docs/weather-sources.md).
  */
-export function assessDiseaseRisk(days: WeatherDay[]): DiseaseRisk {
-  const next3Rain = days.slice(0, 3).reduce((s, d) => s + d.rainMm, 0);
-  const humidDays = days.filter((d) => d.humidity >= 85).length;
-  const heavyRainDays = days.filter((d) => d.rainMm >= 10).length;
-  const minT = Math.min(...days.map((d) => d.tempMin));
-  const maxT = Math.max(...days.map((d) => d.tempMax));
-  const meanT = days.reduce((s, d) => s + (d.tempMax + d.tempMin) / 2, 0) / days.length;
-  const warm = meanT >= 24 && meanT <= 32;
-
-  const rainScore = next3Rain >= 30 || heavyRainDays >= 3 ? 2 : next3Rain >= 10 || heavyRainDays >= 1 ? 1 : 0;
-  const humidScore = humidDays >= 4 ? 2 : humidDays >= 2 ? 1 : 0;
-  const score = rainScore + humidScore + (warm ? 1 : 0);
-  const level: RiskLevel = score >= 4 ? "Elevated" : score >= 2 ? "Moderate" : "Low";
-
-  const drivers: string[] = [];
-  if (humidScore) drivers.push(humidScore === 2 ? "persistently high humidity" : "periods of high humidity");
-  if (rainScore) drivers.push(rainScore === 2 ? "heavy rainfall" : "some rainfall");
-  if (warm && drivers.length) drivers.push("warm temperatures");
-
-  const summary =
-    level === "Low"
-      ? "The 7-day forecast does not show a sustained run of wet, humid weather. Keep routine monitoring in place."
-      : `${level} risk this week due to ${joinList(drivers)}. Warm, wet conditions favor the spread of soil- and water-borne wilt pathogens.`;
-
-  return {
-    level,
-    summary,
-    factors: [
-      `${fmt(next3Rain)} mm cumulative rainfall expected over the next 3 days`,
-      `Relative humidity ≥ 85% on ${humidDays} of the next ${days.length} days`,
-      `Temperature ${minT}–${maxT} °C${warm ? " (within favorable range)" : ""}`,
-    ],
-  };
-}
-
-function fmt(mm: number) {
-  return mm < 10 ? mm.toFixed(1) : String(Math.round(mm));
-}
-
-function joinList(items: string[]) {
-  return items.length <= 1 ? items.join("") : `${items.slice(0, -1).join(", ")} and ${items.at(-1)}`;
+export function forecastRainTotal(forecast: WeatherDay[], days: number): number {
+  const total = forecast.slice(0, days).reduce((s, d) => s + d.rainMm, 0);
+  return total < 10 ? Math.round(total * 10) / 10 : Math.round(total);
 }
 
 // ---------------------------------------------------------------- Incident snapshot
