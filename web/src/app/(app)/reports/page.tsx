@@ -4,10 +4,9 @@ import { FileBarChart, SearchX } from "lucide-react";
 import { Card, PageHeader } from "@/components/ui";
 import { requirePage } from "@/lib/auth";
 import { defaultReportFilters, getReport, parseReportFilters } from "@/lib/incident-stats";
-import { STATUSES } from "@/lib/incident-options";
-import { OTHER_SERIES, REPORT_SERIES } from "@/lib/report-series";
+import { REPORT_SOURCE_NOTE, filterLabels, reportFileName, reportQuery, reportSeries } from "@/lib/report-view";
 import { ReportFilters } from "./report-filters";
-import { PrintButton, StackedColumns } from "./report-chart";
+import { DownloadPdfButton, StackedColumns } from "./report-chart";
 
 export default async function ReportsPage({
   searchParams,
@@ -19,21 +18,14 @@ export default async function ReportsPage({
   const filters = parsed?.filters ?? defaultReportFilters();
   const report = parsed && !parsed.error ? await getReport(supabase, parsed.filters) : null;
 
-  // "Other" only appears when some incidents have a value no longer in the list.
-  const allSeries = report?.totals[OTHER_SERIES.key] ? [...REPORT_SERIES, OTHER_SERIES] : REPORT_SERIES;
-  const series =
-    filters.disease === "all"
-      ? allSeries
-      : [...REPORT_SERIES, OTHER_SERIES].filter((s) => s.key === filters.disease);
-  const diseaseLabel = filters.disease === "all" ? "All suspected diseases" : series[0]?.label;
-  const statusLabel =
-    filters.status === "all" ? "Any status" : `${STATUSES.find((s) => s.value === filters.status)?.label} now`;
+  const series = reportSeries(filters, report);
+  const labels = filterLabels(filters);
 
   return (
     <div className="space-y-6">
       <PageHeader
         title="Reports"
-        description="Summarize recorded field incidents for a period and area, then export them as PDF."
+        description="Summarize recorded field incidents for a period and area, then download them as a PDF."
       />
 
       <Card title="Report filters" className="no-print">
@@ -65,11 +57,12 @@ export default async function ReportsPage({
             <div>
               <h2 className="font-display text-lg font-semibold text-ink">Incident summary</h2>
               <p className="text-xs text-muted">
-                {filters.from} to {filters.to} · {filters.area === "all" ? "All blocks" : `Row ${filters.area}`} ·{" "}
-                {diseaseLabel} · {statusLabel}
+                {labels.range} · {labels.area} · {labels.disease} · {labels.status}
               </p>
             </div>
-            {report.total > 0 && <PrintButton />}
+            {report.total > 0 && (
+              <DownloadPdfButton href={`/reports/export?${reportQuery(filters)}`} fileName={reportFileName(filters)} />
+            )}
           </div>
 
           {report.total === 0 ? (
@@ -86,18 +79,17 @@ export default async function ReportsPage({
                 ))}
               </div>
 
-              <Card title="Incidents per month" description="Stacked by suspected disease, as recorded in the field">
+              <Card
+                title="Incidents per month"
+                className="break-inside-avoid"
+                description="Stacked by suspected disease, as recorded in the field"
+              >
                 <StackedColumns data={report.months} series={series} />
               </Card>
             </>
           )}
 
-          <p className="text-[11px] text-muted">
-            Source: incidents saved in the Incident Log, counted by incident date. Status is each incident&apos;s
-            current status, not its status during the period. &ldquo;Suspected disease&rdquo; is the field
-            team&apos;s observation — not a screening result or a confirmed diagnosis. &ldquo;Other&rdquo; counts
-            suspected-disease values that are no longer in the Incident Log list.
-          </p>
+          <p className="text-[11px] text-muted">{REPORT_SOURCE_NOTE}</p>
         </div>
       )}
     </div>
@@ -118,7 +110,7 @@ function Stat({ label, value, swatch }: { label: string; value: number; swatch?:
   return (
     <div className="rounded-2xl border border-line bg-white p-4 sm:p-5">
       <p className="inline-flex items-center gap-2 text-xs font-medium text-muted sm:text-sm">
-        {swatch && <span className="size-2.5 rounded-sm" style={{ background: swatch }} />}
+        {swatch && <span className="print-colors size-2.5 rounded-sm" style={{ background: swatch }} />}
         {label}
       </p>
       <p className="mt-2 font-display text-3xl font-semibold tabular-nums text-ink">{value}</p>

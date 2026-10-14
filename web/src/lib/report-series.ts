@@ -45,3 +45,20 @@ export interface MonthlyCount {
   label: string;
   counts: Record<string, number>;
 }
+
+/** Incidents in one month across the shown series. */
+export function monthTotal(month: MonthlyCount, series: ReportSeries[]): number {
+  return series.reduce((n, s) => n + month.counts[s.key], 0);
+}
+
+/**
+ * The y axis of the Reports chart: a round maximum and its ticks, highest
+ * first. Shared by the page chart and the PDF so both draw the same scale.
+ */
+export function chartScale(totals: number[]): { max: number; ticks: number[] } {
+  const rawMax = Math.max(...totals, 1);
+  const step = rawMax > 50 ? Math.ceil(rawMax / 50) * 10 : rawMax > 20 ? 10 : rawMax > 5 ? 5 : 1;
+  const max = Math.ceil(rawMax / step) * step;
+  const ticks = Array.from({ length: max / step + 1 }, (_, i) => i * step).reverse();
+  return { max, ticks };
+}

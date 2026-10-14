@@ -1,15 +1,60 @@
 "use client";
 
 import { useState } from "react";
-import { FileDown } from "lucide-react";
+import { FileDown, Loader2 } from "lucide-react";
 import { buttonStyles, cx } from "@/components/ui";
-import type { MonthlyCount, ReportSeries } from "@/lib/report-series";
+import { chartScale, monthTotal, type MonthlyCount, type ReportSeries } from "@/lib/report-series";
 
-export function PrintButton() {
+/**
+ * Downloads the report as a PDF built on the server (/reports/export), which
+ * checks the user's role and reads the same data as this page.
+ */
+export function DownloadPdfButton({ href, fileName }: { href: string; fileName: string }) {
+  const [pending, setPending] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  async function download() {
+    setPending(true);
+    setError(null);
+    try {
+      const res = await fetch(href);
+      if (!res.ok) {
+        const message = await res.text();
+        setError(message || "The PDF couldn't be created. Try again.");
+        return;
+      }
+      // A signed-out session is redirected to the login page instead of an error.
+      if (!res.headers.get("Content-Type")?.includes("application/pdf")) {
+        setError("Your session has ended. Sign in again to download the report.");
+        return;
+      }
+      const url = URL.createObjectURL(await res.blob());
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = fileName;
+      document.body.append(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+    } catch {
+      setError("The PDF couldn't be downloaded. Check your connection and try again.");
+    } finally {
+      setPending(false);
+    }
+  }
+
   return (
-    <button type="button" onClick={() => window.print()} className={cx(buttonStyles.primary, "no-print")}>
-      <FileDown className="size-4" aria-hidden /> Export PDF
-    </button>
+    <div className="no-print flex flex-col items-end gap-1.5">
+      <button type="button" onClick={download} disabled={pending} className={buttonStyles.primary}>
+        {pending ? <Loader2 className="size-4 animate-spin" aria-hidden /> : <FileDown className="size-4" aria-hidden />}
+        {pending ? "Preparing PDF…" : "Download PDF"}
+      </button>
+      {error && (
+        <p role="alert" className="max-w-xs text-right text-xs text-red-700">
+          {error}
+        </p>
+      )}
+    </div>
   );
 }
 
@@ -17,11 +62,8 @@ const COLUMN_MIN_WIDTH = 44;
 
 export function StackedColumns({ data, series }: { data: MonthlyCount[]; series: ReportSeries[] }) {
   const [hover, setHover] = useState<string | null>(null);
-  const totals = data.map((d) => series.reduce((n, s) => n + d.counts[s.key], 0));
-  const rawMax = Math.max(...totals, 1);
-  const step = rawMax > 50 ? Math.ceil(rawMax / 50) * 10 : rawMax > 20 ? 10 : rawMax > 5 ? 5 : 1;
-  const max = Math.ceil(rawMax / step) * step;
-  const ticks = Array.from({ length: max / step + 1 }, (_, i) => i * step).reverse();
+  const totals = data.map((d) => monthTotal(d, series));
+  const { max, ticks } = chartScale(totals);
   const height = 220;
 
   return (
@@ -30,7 +72,7 @@ export function StackedColumns({ data, series }: { data: MonthlyCount[]; series:
       <ul className="mb-4 flex flex-wrap gap-4">
         {series.map((s) => (
           <li key={s.key} className="inline-flex items-center gap-2 text-xs text-muted">
-            <span className="size-2.5 rounded-sm" style={{ background: s.color }} />
+            <span className="print-colors size-2.5 rounded-sm" style={{ background: s.color }} />
             {s.label}
           </li>
         ))}
@@ -38,7 +80,7 @@ export function StackedColumns({ data, series }: { data: MonthlyCount[]; series:
 
       {/* Scrolls sideways on narrow screens; the top padding keeps hover tooltips from being clipped. */}
       <div className="-mx-1 -mt-28 overflow-x-auto px-1 pt-28">
-        <div className="flex gap-3" style={{ minWidth: data.length * COLUMN_MIN_WIDTH + 36 }}>
+        <div className="print-fit flex gap-3" style={{ minWidth: data.length * COLUMN_MIN_WIDTH + 36 }}>
           {/* Y axis */}
           <div className="relative w-6 shrink-0 text-right text-[11px] tabular-nums text-muted" style={{ height }}>
             {ticks.map((t) => (
@@ -69,7 +111,7 @@ export function StackedColumns({ data, series }: { data: MonthlyCount[]; series:
                     onMouseEnter={() => setHover(d.month)}
                     onMouseLeave={() => setHover(null)}
                   >
-                    {active && <div className="absolute inset-y-0 inset-x-1 rounded-lg bg-leaf-50" aria-hidden />}
+                    {active && <div className="no-print absolute inset-y-0 inset-x-1 rounded-lg bg-leaf-50" aria-hidden />}
                     <div
                       className="relative flex w-7 flex-col-reverse gap-[2px]"
                       style={{ height: `${(totals[i] / max) * 100}%` }}
@@ -77,13 +119,13 @@ export function StackedColumns({ data, series }: { data: MonthlyCount[]; series:
                       {segments.map((s, si) => (
                         <div
                           key={s.key}
-                          className={cx(si === segments.length - 1 && "rounded-t")}
+                          className={cx("print-colors", si === segments.length - 1 && "rounded-t")}
                           style={{ background: s.color, flexGrow: d.counts[s.key], flexBasis: 0 }}
                         />
                       ))}
                     </div>
                     {active && (
-                      <div className="absolute bottom-full z-10 mb-1 w-40 rounded-lg border border-line bg-white p-2.5 text-xs shadow-lg">
+                      <div className="no-print absolute bottom-full z-10 mb-1 w-40 rounded-lg border border-line bg-white p-2.5 text-xs shadow-lg">
                         <p className="mb-1 font-semibold text-ink">{d.label} · {totals[i]} total</p>
                         {series.map((s) => (
                           <p key={s.key} className="flex items-center justify-between gap-2 text-muted">
@@ -109,34 +151,44 @@ export function StackedColumns({ data, series }: { data: MonthlyCount[]; series:
         </div>
       </div>
 
-      {/* Table view */}
-      <details className="mt-5 border-t border-line pt-3">
+      {/* Table view: collapsed on screen; browsers don't print closed <details>, so print gets its own copy. */}
+      <details className="no-print mt-5 border-t border-line pt-3">
         <summary className="cursor-pointer text-xs font-medium text-muted hover:text-ink">Show data table</summary>
         <div className="mt-3 overflow-x-auto">
-          <table className="w-full min-w-[360px] text-left text-sm">
-            <thead>
-              <tr className="text-xs text-muted">
-                <th className="py-1.5 font-medium">Month</th>
-                {series.map((s) => (
-                  <th key={s.key} className="py-1.5 text-right font-medium">{s.label}</th>
-                ))}
-                <th className="py-1.5 text-right font-medium">Total</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-line tabular-nums">
-              {data.map((d, i) => (
-                <tr key={d.month}>
-                  <td className="py-1.5">{d.label}</td>
-                  {series.map((s) => (
-                    <td key={s.key} className="py-1.5 text-right">{d.counts[s.key]}</td>
-                  ))}
-                  <td className="py-1.5 text-right font-semibold">{totals[i]}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+          <DataTable data={data} series={series} totals={totals} />
         </div>
       </details>
+      <div className="print-only mt-5 border-t border-line pt-3">
+        <p className="mb-2 text-xs font-medium text-muted">Data table</p>
+        <DataTable data={data} series={series} totals={totals} />
+      </div>
     </div>
+  );
+}
+
+function DataTable({ data, series, totals }: { data: MonthlyCount[]; series: ReportSeries[]; totals: number[] }) {
+  return (
+    <table className="w-full min-w-[360px] text-left text-sm">
+      <thead>
+        <tr className="text-xs text-muted">
+          <th className="py-1.5 font-medium">Month</th>
+          {series.map((s) => (
+            <th key={s.key} className="py-1.5 text-right font-medium">{s.label}</th>
+          ))}
+          <th className="py-1.5 text-right font-medium">Total</th>
+        </tr>
+      </thead>
+      <tbody className="divide-y divide-line tabular-nums">
+        {data.map((d, i) => (
+          <tr key={d.month}>
+            <td className="py-1.5">{d.label}</td>
+            {series.map((s) => (
+              <td key={s.key} className="py-1.5 text-right">{d.counts[s.key]}</td>
+            ))}
+            <td className="py-1.5 text-right font-semibold">{totals[i]}</td>
+          </tr>
+        ))}
+      </tbody>
+    </table>
   );
 }

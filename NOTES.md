@@ -5,6 +5,67 @@ Update this at the end of each session.
 
 ---
 
+## Session: 2026-10-14 — Reports PDF export (branch `feature/reports-pdf-export`)
+
+PR open into `main`, not merged. No database changes, no migration.
+
+### Added
+
+- `@react-pdf/renderer` (v4.9). It's on Next 16's built-in
+  `serverExternalPackages` list, so no `next.config.ts` change is needed.
+- `web/src/app/(app)/reports/export/route.ts`: `GET /reports/export` with the
+  same query as `/reports`. Signed out or deactivated → 401, a role without
+  `reports.view` → 403, invalid filters → 400 (same messages as the page). It
+  uses the same `parseReportFilters()` / `getReport()` as the page and
+  downloads `banatrack-report-<from>-to-<to>.pdf`.
+- `reports/report-pdf.tsx`: A4 PDF (built-in Helvetica) with the title,
+  Tagum City location, the time it was generated (Asia/Manila), the user's
+  name and role, the filters, summary tiles (with "Other" when present), a
+  stacked chart with the same colors and legend, the full data table (the
+  header repeats on each page), the source note, and "Page X of Y".
+- `lib/report-view.ts`: series selection, filter labels, the source note and
+  the file name, shared by the page and the PDF so they can't disagree.
+  `lib/report-series.ts` gained `monthTotal()` and `chartScale()` (same y
+  axis on both).
+
+### Changed
+
+- Reports: "Export PDF" (`window.print()`) is now "Download PDF". It fetches
+  the PDF and shows "Preparing PDF…", and shows an inline error on failure
+  (including a signed-out session, which the proxy turns into a login
+  redirect).
+- Browser print fix: chart bars and legend/tile swatches use
+  `print-color-adjust: exact`; the collapsed data table is replaced by a
+  print-only full copy; tooltips are hidden; the chart fits the page width
+  and doesn't split across pages.
+- Roadmap: added the later items "Incident list in the Reports PDF" (open
+  question: reporter names in a shareable file) and "Report export logging".
+
+### Tested
+
+- `npx tsc --noEmit`, `npm run lint` and `npm run build` pass.
+- The PDF layout was checked with sample data rendered outside the app
+  (6-month and 24-month ranges, with "Other").
+- Denns tested in the browser (2026-10-14), all passed: PDF download as Admin
+  (all sections, numbers match the page, colored chart, full table, name and
+  role, Philippine time, page numbers); the Resolved status filter matches the
+  page; Field Personnel get "Your role can't download reports." on the export
+  URL; browser print shows colored bars and the full table.
+
+### Known issues / left to do
+
+- Field Personnel can still read `incidents` directly (needed for the
+  Incident Log). The PDF route itself is role-checked.
+- Downloads aren't logged (roadmap: "Report export logging").
+- **Later: npm audit warnings.** `npm audit` reports high-severity advisories
+  in `next`, `sharp` and the ESLint dependencies (`eslint-config-next`,
+  `@next/eslint-plugin-next`, `fast-glob`, `micromatch`, `braces`) plus
+  `source-map-js`. They come from existing packages, not the PDF library.
+  Review them in a separate `chore/` task, without `npm audit fix --force`
+  (it would bump `next` outside the current range).
+
+---
+
 ## Session: 2026-10-11 — Screening and Review Queue (branch `feature/screening-review-queue`)
 
 Migration 007 has been run in Supabase. PR open into `main`, not merged.
