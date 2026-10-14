@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { AlertTriangle, ArrowRight, Droplets, MapPin } from "lucide-react";
+import { ArrowRight, CloudRain, Droplets, MapPin } from "lucide-react";
 import { requireUser } from "@/lib/auth";
 import { PAGES, can, isPageKey } from "@/lib/permissions";
 import { WeatherIcon } from "@/components/weather-icon";
@@ -14,7 +14,7 @@ import {
 import { STATS_WINDOW_DAYS, TOP_SEVERITY, getDashboardStats, type DashboardStats } from "@/lib/incident-stats";
 import { PRIORITY_LABELS } from "@/lib/screening-options";
 import { getAwaitingReview, getModelGovernance, type AwaitingReview } from "@/lib/screenings";
-import { PLANTATION_LOCATION, assessDiseaseRisk, getForecast } from "@/lib/weather";
+import { PLANTATION_LOCATION, forecastRainTotal, getForecast } from "@/lib/weather";
 
 type Tone = "warn" | "good" | "neutral";
 
@@ -74,12 +74,6 @@ function buildStatCards(stats: DashboardStats | null, awaiting: AwaitingReview |
   ];
 }
 
-const RISK_TONE = {
-  Low: { box: "border-leaf-200 bg-leaf-50", icon: "bg-leaf-500 text-white", chip: "ring-leaf-200" },
-  Moderate: { box: "border-banana-300 bg-banana-50", icon: "bg-banana-400 text-ink", chip: "ring-banana-200" },
-  Elevated: { box: "border-banana-500 bg-banana-100", icon: "bg-banana-500 text-ink", chip: "ring-banana-300" },
-};
-
 export default async function DashboardPage({
   searchParams,
 }: {
@@ -101,8 +95,9 @@ export default async function DashboardPage({
 
   const firstName = profile?.full_name?.split(" ")[0];
   const today = forecast?.days[0];
-  const risk = forecast ? assessDiseaseRisk(forecast.days) : null;
-  const tone = RISK_TONE[risk?.level ?? "Moderate"];
+  const rainTotals = forecast
+    ? [3, 7].filter((n) => n <= forecast.days.length).map((n) => ({ days: n, mm: forecastRainTotal(forecast.days, n) }))
+    : [];
 
   return (
     <div className="space-y-6">
@@ -121,44 +116,28 @@ export default async function DashboardPage({
         </p>
       )}
 
-      {/* Disease-favorable conditions banner */}
-      <div
-        className={cx(
-          "relative overflow-hidden rounded-2xl border p-5 sm:p-6",
-          risk ? tone.box : "border-line bg-white",
-        )}
-      >
+      {/* Weather context: placeholder until the weather link is reviewed with the adviser (docs/weather-sources.md). */}
+      <div className="rounded-2xl border border-line bg-white p-5 sm:p-6">
         <div className="flex flex-col gap-4 sm:flex-row sm:items-start">
-          <span
-            className={cx(
-              "grid size-10 shrink-0 place-items-center rounded-xl",
-              risk ? tone.icon : "bg-canvas text-muted",
-            )}
-          >
-            <AlertTriangle className="size-5" aria-hidden />
+          <span className="grid size-10 shrink-0 place-items-center rounded-xl bg-sky-50 text-sky-700">
+            <CloudRain className="size-5" aria-hidden />
           </span>
           <div className="flex-1">
-            <h2 className="font-display text-base font-semibold text-ink">
-              Disease-favorable conditions: {risk?.level ?? "Unavailable"}
-            </h2>
-            {risk ? (
-              <>
-                <p className="mt-1 text-sm text-ink/80">{risk.summary}</p>
-                <ul className="mt-3 flex flex-wrap gap-2">
-                  {risk.factors.map((f) => (
-                    <li key={f} className={cx("rounded-full bg-white/80 px-3 py-1 text-xs text-ink/80 ring-1", tone.chip)}>
-                      {f}
-                    </li>
-                  ))}
-                </ul>
-              </>
+            <h2 className="font-display text-base font-semibold text-ink">Weather context</h2>
+            {rainTotals.length ? (
+              <ul className="mt-2 flex flex-wrap gap-2">
+                {rainTotals.map((r) => (
+                  <li key={r.days} className="rounded-full bg-canvas px-3 py-1 text-xs text-ink/80 ring-1 ring-line">
+                    Forecast rain, next {r.days} days: <span className="font-semibold tabular-nums">{r.mm} mm</span>
+                  </li>
+                ))}
+              </ul>
             ) : (
-              <p className="mt-1 text-sm text-ink/80">
-                The weather forecast couldn&apos;t be loaded, so conditions can&apos;t be assessed right now.
-              </p>
+              <p className="mt-1 text-sm text-ink/80">The weather forecast couldn&apos;t be loaded right now.</p>
             )}
             <p className="mt-3 text-xs text-muted">
-              Contextual indicator based on the Open-Meteo forecast — this is not a diagnosis of any block or plant.
+              Shown for context only. The link between weather and Moko/Panama disease in BanaTrack has not been
+              validated yet; this panel will be updated after consultation.
             </p>
           </div>
         </div>
